@@ -729,7 +729,8 @@ fn find_resource_dir(name: &str) -> Result<std::path::PathBuf, String> {
 /// 通过 Tauri 资源解析查找文件（release），fallback 到手动搜索（dev）
 fn resolve_resource_file(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {
     // Release: Tauri 打包资源目录 (resources/)
-    if let Ok(p) = app.path().resource(name) {
+    if let Ok(base) = app.path().resource_dir() {
+        let p = base.join(name);
         if p.exists() {
             return Ok(p);
         }
@@ -740,7 +741,8 @@ fn resolve_resource_file(app: &tauri::AppHandle, name: &str) -> Result<std::path
 
 /// 通过 Tauri 资源解析查找目录（release），fallback 到手动搜索（dev）
 fn resolve_resource_dir(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {
-    if let Ok(p) = app.path().resource(name) {
+    if let Ok(base) = app.path().resource_dir() {
+        let p = base.join(name);
         if p.is_dir() {
             return Ok(p);
         }
