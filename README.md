@@ -139,5 +139,5 @@ MIT — 见 [LICENSE](LICENSE)
 
 ## 致谢
 
-- Original Python framework by **zxwn**
-- Evangelion NERV / Rei Ayanami narrative shell
+- Original Python framework by **[lingbol088-spec](https://github.com/lingbol088-spec)**
+- Evangelion NERV / Rei Ayanami narrative shell by **[MDX-Tom](https://github.com/MDX-Tom)**
