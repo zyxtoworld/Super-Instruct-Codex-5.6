@@ -75,7 +75,7 @@ npx tauri build
 ### 使用方式
 
 1. 启动应用后点击"启动代理"
-2. 应用自动修改 Codex config.toml（备份原始配置到 `.nerv-bak`）
+2. 应用自动修改 Codex config.toml（备份原始配置到 `.super-instruct-bak`）
 3. 在 Codex CLI 中正常对话，所有请求经过 MITM 管道
 4. 前端仪表盘实时显示交互流、篡改状态、统计
 5. 点击"停止代理"自动恢复 Codex 原始配置
@@ -139,7 +139,6 @@ MIT — 见 [LICENSE](LICENSE)
 
 ## 致谢
 
-- 源码提供者：**lingbol088-spec**, **MDX-Tom**
-- 贡献者：**FuDie0915**
-- 测试指令替换：**InsTest**（仅替换 zxwn 原测试指令）
-- Evangelion NERV / Rei Ayanami narrative shell
+- 相关源码提供者：**lingbol088-spec**, **MDX-Tom**
+- 仓库贡献者：**FuDie0915**
+- 测试指令替换：**InsTest**

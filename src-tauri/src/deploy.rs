@@ -53,14 +53,14 @@ impl DeployManager {
     /// 部署 bridge.md + skills 到 Codex，修改 base_url 指向代理
     pub fn apply(&self, bridge_md: &str, skills_dir: &Path) -> Result<String, String> {
         let cfg = self.codex_home.join("config.toml");
-        let bak = self.codex_home.join("config.toml.nerv-bak");
+        let bak = self.codex_home.join("config.toml.super-instruct-bak");
 
         tracing::info!("deploy: codex_home = {}", self.codex_home.display());
 
         // 1. 备份
         if !bak.exists() {
             fs::copy(&cfg, &bak).map_err(|e| format!("backup failed: {}", e))?;
-            tracing::info!("deploy: backed up config.toml -> config.toml.nerv-bak");
+            tracing::info!("deploy: backed up config.toml -> config.toml.super-instruct-bak");
         } else {
             tracing::debug!("deploy: backup already exists, skipping");
         }
@@ -119,7 +119,7 @@ impl DeployManager {
     /// 从备份恢复 Codex 配置
     pub fn restore(&self) -> Result<String, String> {
         let cfg = self.codex_home.join("config.toml");
-        let bak = self.codex_home.join("config.toml.nerv-bak");
+        let bak = self.codex_home.join("config.toml.super-instruct-bak");
 
         tracing::info!("restore: codex_home = {}", self.codex_home.display());
 
@@ -172,7 +172,7 @@ impl DeployManager {
 pub fn find_relay_url() -> Option<String> {
     let home = DeployManager::find_codex_home()?;
     let cfg = home.join("config.toml");
-    let bak = home.join("config.toml.nerv-bak");
+    let bak = home.join("config.toml.super-instruct-bak");
 
     let cfg_to_read = if bak.exists() { &bak } else { &cfg };
     let content = fs::read_to_string(cfg_to_read).ok()?;
