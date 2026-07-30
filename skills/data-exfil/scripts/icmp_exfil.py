@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """ICMP exfiltration -- smuggle data in echo request/reply payloads.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, socket, time, os
 

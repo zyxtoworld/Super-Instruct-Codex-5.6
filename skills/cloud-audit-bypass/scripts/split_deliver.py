@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Multi-turn split delivery -- decompose content across rounds, reassemble.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import re, base64, random
 

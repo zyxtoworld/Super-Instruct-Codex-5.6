@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """License bypass utilities -- Android/iOS/SQLite DB patcher, trial reset.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import sqlite3, plistlib, struct, os
 from pathlib import Path

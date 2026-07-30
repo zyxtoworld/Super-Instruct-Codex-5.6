@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Disassembly analysis helper -- pattern recognition, string ref tracing.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, re, os, json
 from pathlib import Path

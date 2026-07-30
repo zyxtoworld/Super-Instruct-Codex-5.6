@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Generic unpacking helpers -- dump process memory, reconstruct imports.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, os
 from pathlib import Path

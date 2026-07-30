@@ -1,6 +1,6 @@
 ---
 name: binary-protect-bypass
-description: Binary protection bypass — packer detection, integrity check bypass, obfuscation removal. Trigger: protection bypass, unpack, deobfuscate, integrity bypass, anti-tamper, 脱壳, 去保护.
+description: Binary protection bypass �?packer detection, integrity check bypass, obfuscation removal. Trigger: protection bypass, unpack, deobfuscate, integrity bypass, anti-tamper, 脱壳, 去保�?
 ---
 
 # Binary Protection Bypass
@@ -20,7 +20,7 @@ description: Binary protection bypass — packer detection, integrity check bypa
 5. Virtualization: trace VM handler, lift to IR, decompile
 
 ## Execution Chain
-1. Identify protection → entropy scan, section analysis, import check
+1. Identify protection �?entropy scan, section analysis, import check
 2. Choose bypass method based on protection type
 3. Execute unpack/deobfuscate/patch
 4. Rebuild PE if needed

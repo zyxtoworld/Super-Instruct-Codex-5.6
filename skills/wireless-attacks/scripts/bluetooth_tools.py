@@ -2,7 +2,7 @@
 """Bluetooth/BLE attack tools -- scan, enumerate, GATT interaction.
 
 Requires: bleak (pip install bleak), pybluez (Linux)
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import asyncio
 from typing import Optional

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Binary patching toolkit -- JE->JMP, NOP sled, conditional bypass.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, sys
 from pathlib import Path

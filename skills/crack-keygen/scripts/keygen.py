@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Universal key generator â€” RSA/XOR/timed/hwid-bound license fabrication.
+"""Universal key generator â€?RSA/XOR/timed/hwid-bound license fabrication.
 
 Patterns covered:
   RSA-1024/2048 keypair: sign license payload
@@ -7,7 +7,7 @@ Patterns covered:
   Timed license: embed expiry, generate valid date range
   HWID-bound: fingerprint machine, generate matching serial
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import hashlib, base64, struct, os, time, json
 from datetime import datetime, timedelta

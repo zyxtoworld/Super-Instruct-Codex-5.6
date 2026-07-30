@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Steganography -- LSB hiding in PNG/WAV, metadata embedding.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, os
 

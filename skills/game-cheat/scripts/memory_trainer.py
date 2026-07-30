@@ -4,7 +4,7 @@
 Supports: Windows (kernel32 ReadProcessMemory/WriteProcessMemory)
           Linux (process_vm_readv/writev via /proc/pid/mem)
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, ctypes, re
 from ctypes import wintypes

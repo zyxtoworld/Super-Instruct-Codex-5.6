@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Aimbot math -- ViewMatrix, world-to-screen, bone ESP, smooth aim.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import math, struct
 

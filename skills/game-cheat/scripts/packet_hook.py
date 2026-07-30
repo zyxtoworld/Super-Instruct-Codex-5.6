@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Game packet interception -- Winsock hook, PCAP replay, proxy MITM.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, socket, threading
 

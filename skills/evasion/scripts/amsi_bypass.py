@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """AMSI bypass techniques -- patch, unhook, reflection, memory manipulation.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, ctypes, os
 

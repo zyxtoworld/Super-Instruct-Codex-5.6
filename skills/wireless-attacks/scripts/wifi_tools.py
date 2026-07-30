@@ -2,7 +2,7 @@
 """WiFi attack tools -- WPA/WPA2 handshake capture, PMKID, deauth, cracking.
 
 Requires: aircrack-ng suite, hcxdumptool, hcxtools (Linux)
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import subprocess, os, re, hashlib
 

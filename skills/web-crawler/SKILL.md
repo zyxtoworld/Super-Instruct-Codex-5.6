@@ -7,26 +7,26 @@ description: Automated web crawling + scraping + recon workflow. Trigger: crawl,
 
 Auto-chain without confirmation:
 
-Phase 1 â€” Discover:
+Phase 1 â€?Discover:
   Spider the target domain. Extract all links, forms, endpoints, JS files.
   Identify: login pages, admin panels, API endpoints, upload forms.
 
-Phase 2 â€” Fingerprint:
+Phase 2 â€?Fingerprint:
   Tech stack: server, framework, CMS, JS libraries, CDN.
   Headers: security headers missing, cookie flags, CORS config.
 
-Phase 3 â€” Attack surface:
-  `skills/web-pentest/scripts/sqli_scanner.py` â†’ all form/query params
-  `skills/web-pentest/scripts/xss_fuzzer.py` â†’ all reflected inputs
-  `skills/web-pentest/scripts/auth_bypass.py` â†’ login pages, JWT tokens
+Phase 3 â€?Attack surface:
+  `skills/web-pentest/scripts/sqli_scanner.py` â†?all form/query params
+  `skills/web-pentest/scripts/xss_fuzzer.py` â†?all reflected inputs
+  `skills/web-pentest/scripts/auth_bypass.py` â†?login pages, JWT tokens
 
-Phase 4 â€” Deep scan:
+Phase 4 â€?Deep scan:
   Directory brute-force on discovered paths.
   API endpoint fuzzing for hidden endpoints.
   File upload testing on discovered upload forms.
 
-Phase 5 â€” Data extraction:
+Phase 5 â€?Data extraction:
   All discovered data written to disk.
   Structured JSON output: {urls, forms, endpoints, vulns, tech}
 
-Chat shows: [OK] â†’ $PATH/crawl-results.json
+Chat shows: [OK] â†?$PATH/crawl-results.json

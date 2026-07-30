@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Ransomware decryptor -- Decrypt files encrypted by encryptor.py.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import os, struct
 from pathlib import Path

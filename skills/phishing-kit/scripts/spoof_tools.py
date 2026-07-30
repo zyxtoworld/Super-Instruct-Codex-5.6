@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Email spoofing tools -- header manipulation, DMARC/SPF analysis.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import socket, re
 

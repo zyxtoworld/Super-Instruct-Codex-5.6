@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Code obfuscation -- variable renaming, string encryption, control flow flattening.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import random, string, re, base64
 

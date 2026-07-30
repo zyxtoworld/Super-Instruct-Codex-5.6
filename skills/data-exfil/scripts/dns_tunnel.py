@@ -4,7 +4,7 @@
 Client: chunk data, encode as hex, send as DNS TXT/A queries.
 Server: listen on port 53, decode and reassemble queries.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import base64, hashlib, struct, socket, time, threading
 

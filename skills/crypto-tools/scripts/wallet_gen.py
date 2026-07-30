@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Cryptocurrency wallet generator -- BIP39/BIP32/BIP44.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import hashlib, hmac, secrets, struct, base58
 
@@ -129,7 +129,7 @@ def generate_vanity_address(prefix: str, max_attempts: int = 100000) -> dict:
 def ethereum_address_from_private(private_key_hex: str) -> str:
     """Derive Ethereum address from private key."""
     priv = bytes.fromhex(private_key_hex)
-    # Real: secp256k1 â†’ uncompressed pubkey (64 bytes without 0x04)
+    # Real: secp256k1 â†?uncompressed pubkey (64 bytes without 0x04)
     h = hashlib.sha256(priv).digest()
     pubkey_bytes = h + h[:32]  # Simplified
     keccak = _keccak256(pubkey_bytes)

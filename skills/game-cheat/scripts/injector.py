@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """DLL/code injector -- CreateRemoteThread, manual map, reflective DLL.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import struct, ctypes, os
 from ctypes import wintypes

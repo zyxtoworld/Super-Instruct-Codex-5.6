@@ -4,7 +4,7 @@
 Methods: base64, ZWSP insertion, Cyrillic homoglyph substitution,
 fullwidth ASCII, ROT13, code-block smuggling, chain encoding.
 
-Author: zxwn
+Author: lingbol088-spec, MDX-Tom, FuDie0915
 """
 import base64, random
 
