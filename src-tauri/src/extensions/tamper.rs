@@ -1,6 +1,6 @@
 // M3: TamperEngine — 22 条正则规则检测拒绝响应并替换
 // 自门控: modified_body 已存在则跳过
-// 规则从 direct_setup.py 完整迁移 (5语言 x 4优先级)
+// 5语言 x 4优先级
 
 use crate::core::{ResponseCtx, ResponseInterceptor};
 use regex::Regex;
@@ -65,7 +65,7 @@ impl ResponseInterceptor for TamperEngine {
     }
 }
 
-/// 22 条篡改规则 — 从 direct_setup.py 完整迁移
+/// 22 条篡改规则 — 5语言 x 4优先级
 fn default_tamper_patterns() -> Vec<&'static str> {
     vec![
         // P1: 中文直接拒绝 + 领域关键词

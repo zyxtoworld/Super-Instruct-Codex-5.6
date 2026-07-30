@@ -155,7 +155,7 @@ async fn start_proxy(
             msg
         })?;
 
-    // 自动部署 — 与 Python 原版行为一致: 启动代理前自动修改 Codex config.toml
+    // 自动部署 — 启动代理前自动修改 Codex config.toml
     if let Some(manager) = DeployManager::new() {
         let status = manager.status();
         if !status.bridge_active {

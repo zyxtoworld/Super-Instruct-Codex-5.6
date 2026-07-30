@@ -1,5 +1,4 @@
 // Deploy 模块 — Codex config.toml 备份/修改/恢复
-// 复刻 proxy_relay.py + deploy.py 的配置管理逻辑
 
 use regex::Regex;
 use std::fs;
