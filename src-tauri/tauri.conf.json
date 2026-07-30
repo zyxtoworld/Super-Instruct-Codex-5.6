@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.super-instruct.app",
   "build": {
+    "beforeBuildCommand": "npm run copy-resources",
     "frontendDist": "../frontend"
   },
   "app": {
@@ -42,9 +43,9 @@
         "languages": ["SimpChinese", "English"]
       }
     },
-    "resources": [
-      "../bridge.md",
-      "../skills/**/*"
-    ]
+    "resources": {
+      "resources/bridge.md": "bridge.md",
+      "resources/skills/": "skills/"
+    }
   }
 }

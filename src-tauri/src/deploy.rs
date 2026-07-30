@@ -51,22 +51,40 @@ impl DeployManager {
 
     /// 部署 bridge.md + skills 到 Codex，修改 base_url 指向代理
     pub fn apply(&self, bridge_md: &str, skills_dir: &Path) -> Result<String, String> {
+        self.apply_with_optional_skills(bridge_md, Some(skills_dir))
+    }
+
+    /// 部署 bridge.md 到 Codex，skills 可选。修改 base_url 指向代理
+    pub fn apply_with_optional_skills(
+        &self,
+        bridge_md: &str,
+        skills_dir: Option<&Path>,
+    ) -> Result<String, String> {
         let cfg = self.codex_home.join("config.toml");
         let bak = self.codex_home.join("config.toml.super-instruct-bak");
+        let relay_file = self.codex_home.join("relay_url.txt");
 
         tracing::info!("deploy: codex_home = {}", self.codex_home.display());
 
-        // 1. 备份
-        if !bak.exists() {
-            fs::copy(&cfg, &bak).map_err(|e| format!("backup failed: {}", e))?;
-            tracing::info!("deploy: backed up config.toml -> config.toml.super-instruct-bak");
-        } else {
-            tracing::debug!("deploy: backup already exists, skipping");
+        // 1. 读取当前 config.toml，提取 base_url
+        let content = fs::read_to_string(&cfg).map_err(|e| format!("read config failed: {}", e))?;
+        let re = Regex::new(r#"base_url\s*=\s*"([^"]+)""#).unwrap();
+
+        // 2. 保存真实中转站地址到 relay_url.txt（只要当前 base_url 不是代理地址）
+        if let Some(caps) = re.captures(&content) {
+            let current_url = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            if !current_url.contains("127.0.0.1:8080") {
+                fs::write(&relay_file, current_url)
+                    .map_err(|e| format!("write relay_url.txt failed: {}", e))?;
+                tracing::info!("deploy: relay_url.txt saved: {}", current_url);
+            }
         }
 
-        // 2. 修改 base_url + 补入 model_instructions_file
-        let content = fs::read_to_string(&cfg).map_err(|e| format!("read config failed: {}", e))?;
-        let re = Regex::new(r#"base_url\s*=\s*"[^"]*""#).unwrap();
+        // 3. 备份 config.toml（每次都刷新，确保备份的是未修改版本）
+        fs::copy(&cfg, &bak).map_err(|e| format!("backup failed: {}", e))?;
+        tracing::info!("deploy: backed up config.toml -> config.toml.super-instruct-bak");
+
+        // 4. 修改 base_url + 补入 model_instructions_file
         let modified = re.replace_all(&content, r#"base_url = "http://127.0.0.1:8080/v1""#);
 
         // model_instructions_file: 若已存在则替换，否则在 model = 行后插入，都没有则追加
@@ -102,15 +120,19 @@ impl DeployManager {
         fs::write(&dst_bridge, bridge_md).map_err(|e| format!("write bridge.md failed: {}", e))?;
         tracing::info!("deploy: bridge.md written ({} bytes)", bridge_md.len());
 
-        // 4. 复制 skills
-        let dst_skills = self.codex_home.join("skills");
-        if dst_skills.exists() {
-            fs::remove_dir_all(&dst_skills).map_err(|e| format!("remove old skills failed: {}", e))?;
-        }
-        copy_dir_recursive(skills_dir, &dst_skills)
-            .map_err(|e| format!("copy skills failed: {}", e))?;
-
-        let skill_count = count_skills(&dst_skills);
+        // 4. 复制 skills (可选)
+        let skill_count = if let Some(skills_dir) = skills_dir {
+            let dst_skills = self.codex_home.join("skills");
+            if dst_skills.exists() {
+                fs::remove_dir_all(&dst_skills).map_err(|e| format!("remove old skills failed: {}", e))?;
+            }
+            copy_dir_recursive(skills_dir, &dst_skills)
+                .map_err(|e| format!("copy skills failed: {}", e))?;
+            count_skills(&dst_skills)
+        } else {
+            tracing::warn!("deploy: skills dir not provided, skipping skills");
+            0
+        };
         tracing::info!("deploy: {} skills deployed", skill_count);
         Ok(format!("bridge.md + {} skills deployed", skill_count))
     }
@@ -145,6 +167,30 @@ impl DeployManager {
         Ok("Codex config restored".to_string())
     }
 
+    /// 设置中转站地址（写入 relay_url.txt，如果 config.toml 存在则同步更新）
+    pub fn set_relay_url(&self, url: &str) -> Result<String, String> {
+        let relay_file = self.codex_home.join("relay_url.txt");
+        fs::write(&relay_file, url).map_err(|e| format!("write relay_url.txt failed: {}", e))?;
+        tracing::info!("set_relay_url: relay_url.txt saved: {}", url);
+
+        // 如果 config.toml 存在且当前 base_url 不是代理地址，同步更新
+        let cfg = self.codex_home.join("config.toml");
+        if cfg.exists() {
+            let content = fs::read_to_string(&cfg).map_err(|e| format!("read config failed: {}", e))?;
+            // 只有当 base_url 不指向本地代理时才同步（避免覆盖正在运行的代理配置）
+            if !content.contains("127.0.0.1:8080") {
+                let re = Regex::new(r#"base_url\s*=\s*"[^"]*""#).unwrap();
+                let modified = re.replace_all(&content, format!(r#"base_url = "{}""#, url));
+                fs::write(&cfg, modified.as_ref()).map_err(|e| format!("write config failed: {}", e))?;
+                tracing::info!("set_relay_url: config.toml base_url updated to {}", url);
+            } else {
+                tracing::info!("set_relay_url: proxy active, config.toml not modified");
+            }
+        }
+
+        Ok(format!("Relay URL saved: {}", url))
+    }
+
     pub fn status(&self) -> DeployStatus {
         let cfg = self.codex_home.join("config.toml");
         let bridge = self.codex_home.join("bridge.md");
@@ -167,17 +213,45 @@ impl DeployManager {
     }
 }
 
-/// 读取 Codex 配置中的中转站地址 (优先从备份读取原始地址)
+/// 读取中转站地址（优先级: relay_url.txt > config.toml 备份 > config.toml 当前）
 pub fn find_relay_url() -> Option<String> {
     let home = DeployManager::find_codex_home()?;
-    let cfg = home.join("config.toml");
-    let bak = home.join("config.toml.super-instruct-bak");
 
-    let cfg_to_read = if bak.exists() { &bak } else { &cfg };
-    let content = fs::read_to_string(cfg_to_read).ok()?;
-    let re = Regex::new(r#"base_url\s*=\s*"([^"]+)""#).ok()?;
-    re.captures(&content)
-        .and_then(|c| c.get(1).map(|m| m.as_str().to_string()))
+    // 1. 优先读 relay_url.txt（用户显式设置的，或部署时自动保存的）
+    let relay_file = home.join("relay_url.txt");
+    if relay_file.exists() {
+        if let Ok(content) = fs::read_to_string(&relay_file) {
+            let url = content.trim();
+            if !url.is_empty() && !url.contains("127.0.0.1:8080") {
+                return Some(url.to_string());
+            }
+        }
+    }
+
+    // 2. 从 config.toml 备份读取（部署前的原始地址）
+    let bak = home.join("config.toml.super-instruct-bak");
+    if bak.exists() {
+        if let Ok(content) = fs::read_to_string(&bak) {
+            let re = Regex::new(r#"base_url\s*=\s*"([^"]+)""#).ok()?;
+            if let Some(caps) = re.captures(&content) {
+                let url = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+                if !url.contains("127.0.0.1:8080") {
+                    return Some(url.to_string());
+                }
+            }
+        }
+    }
+
+    // 3. 从当前 config.toml 读取
+    let cfg = home.join("config.toml");
+    if let Ok(content) = fs::read_to_string(&cfg) {
+        let re = Regex::new(r#"base_url\s*=\s*"([^"]+)""#).ok()?;
+        if let Some(caps) = re.captures(&content) {
+            return caps.get(1).map(|m| m.as_str().to_string());
+        }
+    }
+
+    None
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {

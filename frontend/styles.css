@@ -423,6 +423,29 @@ body {
 .cfg-msg.ok { color: var(--green); background: var(--green-bg); border: 1px solid rgba(52,199,89,0.15); }
 .cfg-msg.err { color: var(--c-crack); background: var(--c-crack-bg); border: 1px solid rgba(255,59,48,0.15); }
 
+/* ═══ 中转站编辑 ═══ */
+.cfg-relay-edit { display: flex; gap: 8px; padding: 14px 16px; align-items: center; }
+.cfg-input {
+    flex: 1;
+    background: var(--panel-flat);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-sm);
+    padding: 7px 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+.cfg-input:focus { border-color: var(--c-crack); background: #fff; }
+.cfg-input::placeholder { color: var(--text-4); }
+.cfg-relay-hint {
+    padding: 0 16px 10px;
+    font-size: 11px;
+    color: var(--text-4);
+    line-height: 1.5;
+}
+
 /* ═══ 滚动条 ═══ */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -11,7 +11,7 @@ if ($LASTEXITCODE -ne 0) { Write-Host "npm install failed" -ForegroundColor Red;
 
 # 2. 构建 Tauri release bundle
 Write-Host "[2/3] Building Tauri release bundle..." -ForegroundColor Yellow
-npx tauri build
+npx tauri build --bundles nsis
 if ($LASTEXITCODE -ne 0) { Write-Host "tauri build failed" -ForegroundColor Red; exit 1 }
 
 # 3. 列出产物

@@ -11,10 +11,10 @@
 
 <!-- ═══ 标题栏 ═══ -->
 <div class="titlebar" data-tauri-drag-region>
-    <div class="tb-logo">
-        <div class="tb-logo-mark"></div>
-        <span class="tb-logo-text">Super-Instruct</span>
-        <span class="tb-logo-sub">v5.6</span>
+    <div class="tb-logo" data-tauri-drag-region>
+        <div class="tb-logo-mark" data-tauri-drag-region></div>
+        <span class="tb-logo-text" data-tauri-drag-region>Super-Instruct</span>
+        <span class="tb-logo-sub" data-tauri-drag-region>v5.6</span>
     </div>
     <div class="tb-spacer" data-tauri-drag-region></div>
     <button class="tb-btn" id="tb-minimize" title="最小化">—</button>
@@ -114,6 +114,15 @@
                     <div class="cfg-line"><div class="cfg-k">安装路径</div><div class="cfg-v" id="cfg-codex-home">--</div></div>
                     <div class="cfg-line"><div class="cfg-k">中转站</div><div class="cfg-v" id="cfg-relay-url">--</div></div>
                     <div class="cfg-line"><div class="cfg-k">部署状态</div><div class="cfg-v" id="cfg-bridge-status">--</div></div>
+                </div>
+                <div class="cfg-block">
+                    <div class="cfg-block-head">中转站地址</div>
+                    <div class="cfg-relay-edit">
+                        <input type="text" id="cfg-relay-input" class="cfg-input" placeholder="https://your-relay-url.com/v1" autocomplete="off" spellcheck="false">
+                        <button class="btn btn-red solid" id="btn-save-relay">保存</button>
+                    </div>
+                    <div class="cfg-relay-hint">代理启动时会自动读取此地址作为上游转发目标。请勿填 http://127.0.0.1:8080，那是本地代理端口。</div>
+                    <div class="cfg-msg" id="cfg-relay-message"></div>
                 </div>
                 <div class="cfg-block">
                     <div class="cfg-block-head">部署操作</div>

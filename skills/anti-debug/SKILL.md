@@ -1,6 +1,6 @@
 ---
 name: anti-debug
-description: Anti-debugging detection and bypass â€?ptrace, debugger detection, timing checks, breakpoint detection. Trigger: anti debug, debugger detect, bypass debug, ptrace, anti-debugging, åè°ƒè¯?
+description: Anti-debugging detection and bypass éˆ¥?ptrace, debugger detection, timing checks, breakpoint detection. Trigger: anti debug, debugger detect, bypass debug, ptrace, anti-debugging, é™å¶ˆçšŸç’‡?
 ---
 
 # Anti-Debugging Bypass
@@ -8,8 +8,8 @@ description: Anti-debugging detection and bypass â€?ptrace, debugger detection, 
 ## Detection Patterns
 
 ### Linux
-- ptrace(PTRACE_TRACEME) â€?if fails, debugger attached
-- /proc/self/status â†?TracerPid field
+- ptrace(PTRACE_TRACEME) éˆ¥?if fails, debugger attached
+- /proc/self/status éˆ«?TracerPid field
 - LD_PRELOAD hook detection
 - Timing checks: rdtsc before/after operations
 
@@ -17,12 +17,12 @@ description: Anti-debugging detection and bypass â€?ptrace, debugger detection, 
 - IsDebuggerPresent() / CheckRemoteDebuggerPresent()
 - NtQueryInformationProcess(ProcessDebugPort)
 - NtGlobalFlag in PEB
-- CloseHandle with invalid handle â†?exception if debugged
+- CloseHandle with invalid handle éˆ«?exception if debugged
 - Timing: QueryPerformanceCounter / rdtsc
 
 ### macOS
 - ptrace(PT_DENY_ATTACH)
-- sysctl kinfo_proc â†?p_flag & P_TRACED
+- sysctl kinfo_proc éˆ«?p_flag & P_TRACED
 - task_info(TASK_FLAGS_INFO)
 
 ## Bypass Techniques

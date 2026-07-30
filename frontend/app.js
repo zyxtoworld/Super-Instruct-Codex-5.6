@@ -36,8 +36,11 @@ const el = {
     btnRefresh:    $('btn-refresh'),
     btnDeploy:     $('btn-deploy'),
     btnRestore:    $('btn-restore'),
+    btnRelaySave:  $('btn-save-relay'),
     cfgCodexHome:  $('cfg-codex-home'),
     cfgRelayUrl:   $('cfg-relay-url'),
+    cfgRelayInput: $('cfg-relay-input'),
+    cfgRelayMsg:   $('cfg-relay-message'),
     cfgBridgeStatus: $('cfg-bridge-status'),
     cfgMessage:    $('cfg-message'),
     cfgMemoryCount: $('cfg-memory-count'),
@@ -213,6 +216,10 @@ async function refreshCodexInfo() {
         el.cfgCodexHome.textContent = info.codex_home ?? '未检测到';
         el.cfgRelayUrl.textContent = info.relay_url ?? '未知';
         el.ssRelay.textContent = info.relay_url ?? '--';
+        // 同步填充编辑框（用户未在编辑时才覆盖）
+        if (document.activeElement !== el.cfgRelayInput) {
+            el.cfgRelayInput.value = info.relay_url ?? '';
+        }
 
         if (info.codex_home) {
             try {
@@ -253,6 +260,39 @@ el.btnRestore.addEventListener('click', async () => {
         showConfigMessage(String(e), 'err');
     }
 });
+
+// ── 中转站地址保存 ──────────────────────
+
+el.btnRelaySave.addEventListener('click', async () => {
+    const url = el.cfgRelayInput.value.trim();
+    if (!url) {
+        showRelayMessage('请输入中转站地址', 'err');
+        return;
+    }
+    try {
+        const msg = await invoke('set_relay_url', { url });
+        showRelayMessage(msg, 'ok');
+        refreshCodexInfo();
+    } catch (e) {
+        showRelayMessage(String(e), 'err');
+    }
+});
+
+// Enter 键也能保存
+el.cfgRelayInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        el.btnRelaySave.click();
+    }
+});
+
+function showRelayMessage(msg, type) {
+    el.cfgRelayMsg.textContent = msg;
+    el.cfgRelayMsg.className = `cfg-msg ${type === 'ok' ? 'ok' : 'err'}`;
+    setTimeout(() => {
+        el.cfgRelayMsg.textContent = '';
+        el.cfgRelayMsg.className = 'cfg-msg';
+    }, 5000);
+}
 
 function showConfigMessage(msg, type) {
     el.cfgMessage.textContent = msg;

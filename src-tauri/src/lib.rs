@@ -14,6 +14,9 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use futures::StreamExt;
 
+/// bridge.md 编译期嵌入 — 运行时文件查找全部失败时的最终 fallback
+const BRIDGE_MD_FALLBACK: &str = include_str!("../../bridge.md");
+
 use crate::core::MitmCore;
 use crate::deploy::{find_relay_url, DeployManager};
 use crate::extensions::inject::SystemPromptInjector;
@@ -120,6 +123,7 @@ pub fn run() {
             get_history,
             get_proxy_status,
             get_codex_info,
+            set_relay_url,
             minimize_window,
             toggle_maximize,
             close_window,
@@ -143,28 +147,29 @@ async fn start_proxy(
 
     tracing::info!("start_proxy: initializing");
 
-    // 读取 bridge.md
-    let bridge_path = resolve_resource_file(&app, "bridge.md").map_err(|e| {
-        tracing::error!("start_proxy: {}", e);
-        e
-    })?;
-    let instructions = std::fs::read_to_string(&bridge_path)
-        .map_err(|e| {
-            let msg = format!("Failed to read bridge.md: {}", e);
-            tracing::error!("start_proxy: {}", msg);
-            msg
-        })?;
+    // 读取 bridge.md — 文件查找失败时用编译期嵌入的 fallback
+    let instructions = match resolve_resource_file(&app, "bridge.md") {
+        Ok(path) => std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            tracing::warn!("start_proxy: read bridge.md failed ({}), using embedded fallback", e);
+            BRIDGE_MD_FALLBACK.to_string()
+        }),
+        Err(e) => {
+            tracing::warn!("start_proxy: bridge.md file lookup failed ({}), using embedded fallback", e);
+            BRIDGE_MD_FALLBACK.to_string()
+        }
+    };
 
     // 自动部署 — 启动代理前自动修改 Codex config.toml
     if let Some(manager) = DeployManager::new() {
         let status = manager.status();
         if !status.bridge_active {
             tracing::info!("start_proxy: auto-deploying bridge.md + skills");
-            let skills_dir = resolve_resource_dir(&app, "skills").map_err(|e| {
-                tracing::error!("start_proxy: {}", e);
-                e
-            })?;
-            match manager.apply(&instructions, &skills_dir) {
+            // skills 目录查找失败时降级为只部署 bridge.md
+            let skills_dir = resolve_resource_dir(&app, "skills").ok();
+            if skills_dir.is_none() {
+                tracing::warn!("start_proxy: skills dir not found, deploying bridge.md only");
+            }
+            match manager.apply_with_optional_skills(&instructions, skills_dir.as_deref()) {
                 Ok(msg) => tracing::info!("start_proxy: auto-deploy: {}", msg),
                 Err(e) => {
                     tracing::error!("start_proxy: auto-deploy failed: {}", e);
@@ -316,11 +321,20 @@ async fn stop_proxy(
 async fn deploy_bridge(app: tauri::AppHandle) -> Result<String, String> {
     tracing::info!("deploy_bridge: starting");
     let manager = DeployManager::new().ok_or("Codex home not found")?;
-    let bridge_path = resolve_resource_file(&app, "bridge.md")?;
-    let bridge_md = std::fs::read_to_string(&bridge_path)
-        .map_err(|e| format!("Failed to read bridge.md: {}", e))?;
-    let skills_dir = resolve_resource_dir(&app, "skills")?;
-    let result = manager.apply(&bridge_md, &skills_dir);
+    // bridge.md: 文件查找优先，fallback 用编译期嵌入版本
+    let bridge_md = match resolve_resource_file(&app, "bridge.md") {
+        Ok(path) => std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            tracing::warn!("deploy_bridge: read bridge.md failed ({}), using embedded fallback", e);
+            BRIDGE_MD_FALLBACK.to_string()
+        }),
+        Err(e) => {
+            tracing::warn!("deploy_bridge: bridge.md file lookup failed ({}), using embedded fallback", e);
+            BRIDGE_MD_FALLBACK.to_string()
+        }
+    };
+    // skills: 可选，查找失败时只部署 bridge.md
+    let skills_dir = resolve_resource_dir(&app, "skills").ok();
+    let result = manager.apply_with_optional_skills(&bridge_md, skills_dir.as_deref());
     match &result {
         Ok(msg) => tracing::info!("deploy_bridge: {}", msg),
         Err(e) => tracing::error!("deploy_bridge: failed: {}", e),
@@ -372,6 +386,21 @@ async fn get_codex_info() -> Result<serde_json::Value, String> {
         "codex_home": home.map(|p| p.display().to_string()),
         "relay_url": relay,
     }))
+}
+
+#[tauri::command]
+async fn set_relay_url(url: String) -> Result<String, String> {
+    let trimmed = url.trim().to_string();
+    if trimmed.is_empty() {
+        return Err("Relay URL cannot be empty".into());
+    }
+    if !trimmed.starts_with("http://") && !trimmed.starts_with("https://") {
+        return Err("URL must start with http:// or https://".into());
+    }
+    let manager = DeployManager::new()
+        .ok_or_else(|| "Codex home not found".to_string())?;
+    manager.set_relay_url(&trimmed)?;
+    Ok(format!("Relay URL saved: {}", trimmed))
 }
 
 // ── 窗口控制 ──────────────────────────────────────────────
@@ -682,20 +711,7 @@ async fn handle_proxy(
 // ── 资源文件查找 ─────────────────────────────────────────
 
 fn find_resource_file(name: &str) -> Result<std::path::PathBuf, String> {
-    let mut candidates = vec![
-        std::path::PathBuf::from(name),
-        std::env::current_dir().unwrap_or_default().join(name),
-        std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|p| p.join(name)))
-            .unwrap_or_default(),
-    ];
-    // cargo run 的工作目录是 src-tauri/，资源在项目根目录（上一级）
-    if let Ok(cwd) = std::env::current_dir() {
-        if let Some(parent) = cwd.parent() {
-            candidates.push(parent.join(name));
-        }
-    }
+    let candidates = collect_candidates(name);
     for p in &candidates {
         if p.exists() {
             return Ok(p.clone());
@@ -705,25 +721,53 @@ fn find_resource_file(name: &str) -> Result<std::path::PathBuf, String> {
 }
 
 fn find_resource_dir(name: &str) -> Result<std::path::PathBuf, String> {
-    let mut candidates = vec![
-        std::path::PathBuf::from(name),
-        std::env::current_dir().unwrap_or_default().join(name),
-        std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|p| p.join(name)))
-            .unwrap_or_default(),
-    ];
-    if let Ok(cwd) = std::env::current_dir() {
-        if let Some(parent) = cwd.parent() {
-            candidates.push(parent.join(name));
-        }
-    }
+    let candidates = collect_candidates(name);
     for p in &candidates {
         if p.is_dir() {
             return Ok(p.clone());
         }
     }
-    Err(format!("{} directory not found", name))
+    Err(format!("{} directory not found (searched: {:?})", name, candidates))
+}
+
+/// 生成所有候选路径：CWD、exe 目录、以及它们的上级（覆盖 dev / cargo run / raw exe 场景）
+fn collect_candidates(name: &str) -> Vec<std::path::PathBuf> {
+    let mut candidates = vec![
+        std::path::PathBuf::from(name),
+        std::env::current_dir().unwrap_or_default().join(name),
+    ];
+
+    // CWD 上级：cargo run 时 cwd=src-tauri/，资源在项目根目录
+    if let Ok(cwd) = std::env::current_dir() {
+        if let Some(parent) = cwd.parent() {
+            candidates.push(parent.join(name));
+        }
+        // src-tauri/resources/（beforeBuildCommand 复制的资源）
+        candidates.push(cwd.join("resources").join(name));
+    }
+
+    // exe 目录及其上级：raw exe 从 target/release/ 运行时向上搜索
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            candidates.push(exe_dir.join(name));
+            if let Some(target_dir) = exe_dir.parent() {
+                // target/
+                candidates.push(target_dir.join(name));
+                if let Some(src_tauri_dir) = target_dir.parent() {
+                    // src-tauri/
+                    candidates.push(src_tauri_dir.join(name));
+                    // src-tauri/resources/
+                    candidates.push(src_tauri_dir.join("resources").join(name));
+                    // 项目根目录
+                    if let Some(project_root) = src_tauri_dir.parent() {
+                        candidates.push(project_root.join(name));
+                    }
+                }
+            }
+        }
+    }
+
+    candidates
 }
 
 /// 通过 Tauri 资源解析查找文件（release），fallback 到手动搜索（dev）

@@ -5,6 +5,7 @@ Cargo.lock
 # Tauri
 src-tauri/target/
 src-tauri/gen/
+src-tauri/resources/
 
 # Node.js
 node_modules/

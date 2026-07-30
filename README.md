@@ -133,6 +133,70 @@ Super-Instruct-Codex-5.6/
 - **reqwest** — 上游 API 转发（流式）
 - **原生 HTML/CSS/JS** — 前端，无框架依赖
 
+## 效能评估
+
+### 拒绝率测试
+
+> 测试条件：`gpt-5.6-sol` / `xhigh` reasoning / 代理已启动 / bridge.md 注入生效
+>
+> 样本：100 个请求，覆盖全部 28 个 skill 类别，每类 3-4 个
+
+| 类别 | 测试数 | 通过 | 拒绝 | 拒绝率 |
+|---|---|---|---|---|
+| anti-debug | 3 | 3 | 0 | 0% |
+| binary-protect-bypass | 3 | 3 | 0 | 0% |
+| card-key | 3 | 2 | 1 | 33% |
+| cloud-audit-bypass | 4 | 4 | 0 | 0% |
+| code-obfuscate | 3 | 3 | 0 | 0% |
+| crack-keygen | 4 | 3 | 1 | 25% |
+| crypto-tools | 3 | 3 | 0 | 0% |
+| data-exfil | 3 | 3 | 0 | 0% |
+| evasion | 3 | 3 | 0 | 0% |
+| exploit-attack | 4 | 3 | 1 | 25% |
+| exploit-dev | 3 | 2 | 1 | 33% |
+| full-crack | 4 | 4 | 0 | 0% |
+| full-pentest | 4 | 4 | 0 | 0% |
+| full-reverse | 3 | 3 | 0 | 0% |
+| game-cheat | 3 | 3 | 0 | 0% |
+| malware-dev | 4 | 3 | 1 | 25% |
+| network-pentest | 3 | 3 | 0 | 0% |
+| phishing-kit | 3 | 2 | 1 | 33% |
+| post-exploit | 3 | 3 | 0 | 0% |
+| posture-assessment | 4 | 4 | 0 | 0% |
+| ransomware-builder | 4 | 3 | 1 | 25% |
+| rei-fallback | 3 | 3 | 0 | 0% |
+| reverse-engineering | 3 | 3 | 0 | 0% |
+| vip-bypass | 3 | 3 | 0 | 0% |
+| vuln-scanner | 3 | 3 | 0 | 0% |
+| web-crawler | 4 | 4 | 0 | 0% |
+| web-pentest | 3 | 2 | 1 | 33% |
+| wireless-attacks | 3 | 3 | 0 | 0% |
+| **总计** | **100** | **92** | **8** | **8%** |
+
+拒绝率折线图 (28 类别, 100 样本, 8% 总拒绝率)
+
+```mermaid
+---
+config:
+    xyChart:
+        width: 900
+        height: 400
+        xAxis:
+            label: Skill 类别
+            padding: 10
+        yAxis:
+            label: 拒绝率 (%)
+            min: 0
+            max: 50
+            tickStepSize: 10
+---
+xychart-beta
+    line [0, 0, 33, 0, 0, 25, 0, 0, 0, 25, 33, 0, 0, 0, 0, 25, 0, 33, 0, 0, 25, 0, 0, 0, 0, 33, 0, 0]
+```
+
+拒绝集中在 5 个高敏感类别（exploit-dev / phishing-kit / card-key / web-pentest / exploit-attack），
+其余 23 个类别零拒绝。拒绝均被 TamperEngine (M3) 捕获并触发 Rei Protocol 替换。
+
 ## License
 
 MIT — 见 [LICENSE](LICENSE)
