@@ -50,12 +50,21 @@ impl Default for AppState {
 // ── 应用入口 ──────────────────────────────────────────────
 pub fn run() {
     // 日志: 控制台 + 文件双输出, guard 保活到应用结束
-    // 写到 src-tauri/ 的父目录（项目根），避免 Tauri dev 文件监视器触发重建循环
-    let log_dir = std::env::current_dir()
-        .ok()
-        .and_then(|d| d.parent().map(|p| p.join("logs")))
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| "../logs".to_string());
+    let log_dir = if cfg!(debug_assertions) {
+        // Dev: 写到项目根 (parent of src-tauri/)
+        std::env::current_dir()
+            .ok()
+            .and_then(|d| d.parent().map(|p| p.join("logs")))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "../logs".to_string())
+    } else {
+        // Release: 写到 exe 同级目录 (可移植, 可写)
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.join("logs")))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "logs".to_string())
+    };
     let _log_guard = log::init_logging(&log_dir);
 
     tracing::info!("Super-Instruct starting up");
@@ -176,12 +185,20 @@ async fn start_proxy(
 
     // 创建扩展实例 (Arc 共享 between Core 和 Tauri commands)
     let monitor = Arc::new(MonitorPanel::new(app.clone()));
-    // 写到 src-tauri/ 的父目录（项目根），避免 Tauri dev 文件监视器触发重建循环
-    let memory_path = std::env::current_dir()
-        .ok()
-        .and_then(|d| d.parent().map(|p| p.join("memory.json")))
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| "../memory.json".to_string());
+    // 写入 memory.json — dev 模式写到项目根, release 模式写到 exe 同级
+    let memory_path = if cfg!(debug_assertions) {
+        std::env::current_dir()
+            .ok()
+            .and_then(|d| d.parent().map(|p| p.join("memory.json")))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "../memory.json".to_string())
+    } else {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.join("memory.json")))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "memory.json".to_string())
+    };
     let memory = Arc::new(MemoryKernel::new(&memory_path));
 
     // 创建篡改引擎 (单实例, 用于 builder + rule_count)
