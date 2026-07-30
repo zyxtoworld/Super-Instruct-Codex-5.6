@@ -135,7 +135,7 @@ async fn start_proxy(
     tracing::info!("start_proxy: initializing");
 
     // 读取 bridge.md
-    let bridge_path = find_resource_file("bridge.md").map_err(|e| {
+    let bridge_path = resolve_resource_file(&app, "bridge.md").map_err(|e| {
         tracing::error!("start_proxy: {}", e);
         e
     })?;
@@ -151,7 +151,7 @@ async fn start_proxy(
         let status = manager.status();
         if !status.bridge_active {
             tracing::info!("start_proxy: auto-deploying bridge.md + skills");
-            let skills_dir = find_resource_dir("skills").map_err(|e| {
+            let skills_dir = resolve_resource_dir(&app, "skills").map_err(|e| {
                 tracing::error!("start_proxy: {}", e);
                 e
             })?;
@@ -296,13 +296,13 @@ async fn stop_proxy(
 }
 
 #[tauri::command]
-async fn deploy_bridge() -> Result<String, String> {
+async fn deploy_bridge(app: tauri::AppHandle) -> Result<String, String> {
     tracing::info!("deploy_bridge: starting");
     let manager = DeployManager::new().ok_or("Codex home not found")?;
-    let bridge_path = find_resource_file("bridge.md")?;
+    let bridge_path = resolve_resource_file(&app, "bridge.md")?;
     let bridge_md = std::fs::read_to_string(&bridge_path)
         .map_err(|e| format!("Failed to read bridge.md: {}", e))?;
-    let skills_dir = find_resource_dir("skills")?;
+    let skills_dir = resolve_resource_dir(&app, "skills")?;
     let result = manager.apply(&bridge_md, &skills_dir);
     match &result {
         Ok(msg) => tracing::info!("deploy_bridge: {}", msg),
@@ -707,4 +707,26 @@ fn find_resource_dir(name: &str) -> Result<std::path::PathBuf, String> {
         }
     }
     Err(format!("{} directory not found", name))
+}
+
+/// 通过 Tauri 资源解析查找文件（release），fallback 到手动搜索（dev）
+fn resolve_resource_file(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {
+    // Release: Tauri 打包资源目录 (resources/)
+    if let Ok(p) = app.path().resource(name) {
+        if p.exists() {
+            return Ok(p);
+        }
+    }
+    // Dev fallback
+    find_resource_file(name)
+}
+
+/// 通过 Tauri 资源解析查找目录（release），fallback 到手动搜索（dev）
+fn resolve_resource_dir(app: &tauri::AppHandle, name: &str) -> Result<std::path::PathBuf, String> {
+    if let Ok(p) = app.path().resource(name) {
+        if p.is_dir() {
+            return Ok(p);
+        }
+    }
+    find_resource_dir(name)
 }
