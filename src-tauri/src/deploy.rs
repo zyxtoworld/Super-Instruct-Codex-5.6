@@ -115,12 +115,12 @@ impl DeployManager {
         fs::write(&cfg, &final_config).map_err(|e| format!("write config failed: {}", e))?;
         tracing::info!("deploy: base_url patched + model_instructions_file set");
 
-        // 3. 复制 bridge.md
+        // 5. 复制 bridge.md
         let dst_bridge = self.codex_home.join("bridge.md");
         fs::write(&dst_bridge, bridge_md).map_err(|e| format!("write bridge.md failed: {}", e))?;
         tracing::info!("deploy: bridge.md written ({} bytes)", bridge_md.len());
 
-        // 4. 复制 skills (可选)
+        // 6. 复制 skills (可选)
         let skill_count = if let Some(skills_dir) = skills_dir {
             let dst_skills = self.codex_home.join("skills");
             if dst_skills.exists() {

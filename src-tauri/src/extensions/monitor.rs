@@ -45,6 +45,7 @@ pub struct StatsEvent {
     pub reverse: u64,
     pub pentest: u64,
     pub tamper: u64,
+    pub memory_count: u64,
 }
 
 impl MonitorPanel {
@@ -64,6 +65,7 @@ impl MonitorPanel {
             reverse: self.stats.reverse.load(Ordering::Relaxed),
             pentest: self.stats.pentest.load(Ordering::Relaxed),
             tamper: self.stats.tamper.load(Ordering::Relaxed),
+            memory_count: 0,
         }
     }
 

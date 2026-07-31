@@ -357,8 +357,12 @@ async fn restore_codex() -> Result<String, String> {
 #[tauri::command]
 async fn get_stats(state: tauri::State<'_, AppState>) -> Result<StatsEvent, String> {
     let monitor = state.monitor.read().await;
-    let monitor = monitor.as_ref().ok_or("Proxy not running")?;
-    Ok(monitor.get_stats())
+    let memory = state.memory.read().await;
+    let mut stats = monitor.as_ref().ok_or("Proxy not running")?.get_stats();
+    if let Some(mem) = memory.as_ref() {
+        stats.memory_count = mem.success_count();
+    }
+    Ok(stats)
 }
 
 #[tauri::command]

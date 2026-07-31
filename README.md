@@ -59,7 +59,7 @@ Codex CLI ──HTTP :8080──▶ MITM Core (管道编排)
 ### 开发模式
 
 ```bash
-cd D:\Project\Super-Instruct-Codex-5.6
+cd /path/to/Super-Instruct-Codex-5.6
 npm install
 npx tauri dev
 ```
