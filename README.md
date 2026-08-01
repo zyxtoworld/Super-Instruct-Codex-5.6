@@ -206,3 +206,7 @@ MIT — 见 [LICENSE](LICENSE)
 - 相关源码提供者：**lingbol088-spec**, **MDX-Tom**
 - 仓库贡献者：**FuDie0915**
 - 测试指令替换：**InsTest**
+
+## 友链
+
+- [LinuxDo](https://linux.do) — 真诚、友善、团结的中文技术社区
