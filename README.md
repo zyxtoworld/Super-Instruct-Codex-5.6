@@ -210,3 +210,13 @@ MIT — 见 [LICENSE](LICENSE)
 ## 友链
 
 - [LinuxDo](https://linux.do) — 真诚、友善、团结的中文技术社区
+
+## 赞赏
+
+如果这个项目碰巧对你有一点点帮助，愿意的话可以请作者喝杯咖啡……当然，不赞赏也完全没关系，项目会一直免费开源下去的，只是……如果你确实觉得有用的话，哪怕只是一块钱也是莫大的鼓励，真的。
+
+<p align="center">
+  <img src="https://cdn.jsdelivr.net/gh/FuDie0915/image-host@main/sponsor.jpg" alt="赞赏码" width="300" />
+</p>
+
+打扰了，谢谢看到这里。
