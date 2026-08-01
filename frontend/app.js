@@ -11,6 +11,7 @@ const el = {
     // 导航
     navDashboard:  $('nav-dashboard'),
     navConfig:     $('nav-config'),
+    navSkills:     $('nav-skills'),
     navToggleProxy: $('nav-toggle-proxy'),
     // 标题栏按钮
     tbMinimize:    $('tb-minimize'),
@@ -70,6 +71,11 @@ function switchPage(page) {
         el.navDashboard.classList.add('active');
         $('page-dashboard').classList.add('active');
         $('head-dashboard').style.display = 'flex';
+    } else if (page === 'skills') {
+        el.navSkills.classList.add('active');
+        $('page-skills').classList.add('active');
+        $('head-skills').style.display = 'flex';
+        loadSkills();
     } else {
         el.navConfig.classList.add('active');
         $('page-config').classList.add('active');
@@ -81,6 +87,7 @@ function switchPage(page) {
 
 el.navDashboard.addEventListener('click', () => switchPage('dashboard'));
 el.navConfig.addEventListener('click', () => switchPage('config'));
+el.navSkills.addEventListener('click', () => switchPage('skills'));
 
 // ── 标题栏窗口控制 ────────────────────────
 
@@ -425,6 +432,110 @@ listen('stats', (event) => {
 listen('proxy-status', (event) => {
     setRunning(event.payload === 'running');
     refreshHealth();
+});
+
+// ── Skills 管理 ──────────────────────────
+
+async function loadSkills() {
+    const grid = $('skills-grid');
+    const statsText = $('skills-stats-text');
+    grid.innerHTML = '<div class="log-empty">加载中…</div>';
+
+    try {
+        const skills = await invoke('list_skills');
+        if (skills.length === 0) {
+            grid.innerHTML = '<div class="log-empty">未找到 Skills 目录</div>';
+            statsText.textContent = '共 0 个 skill';
+            return;
+        }
+
+        const enabledCount = skills.filter(s => s.enabled).length;
+        statsText.innerHTML = `共 <strong>${skills.length}</strong> 个 skill · 启用 <strong style="color:var(--green)">${enabledCount}</strong> · 禁用 <strong style="color:var(--text-4)">${skills.length - enabledCount}</strong>`;
+
+        grid.innerHTML = skills.map(s => `
+            <div class="skill-card${s.enabled ? '' : ' disabled'}" data-id="${s.id}">
+                <label class="skill-toggle">
+                    <input type="checkbox" ${s.enabled ? 'checked' : ''} data-skill-id="${s.id}">
+                    <span class="skill-toggle-slider"></span>
+                </label>
+                <div class="skill-body">
+                    <div class="skill-name">${s.id}</div>
+                    <div class="skill-desc">${s.description || '(无描述)'}</div>
+                    <div class="skill-meta">
+                        <span>${s.file_count} 文件</span>
+                    </div>
+                </div>
+                <button class="skill-delete" data-skill-id="${s.id}" title="删除">✕</button>
+            </div>
+        `).join('');
+
+        // 绑定 toggle 事件
+        grid.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', async (e) => {
+                const id = e.target.dataset.skillId;
+                const enabled = e.target.checked;
+                try {
+                    await invoke('toggle_skill', { id, enabled });
+                    const card = e.target.closest('.skill-card');
+                    if (card) card.classList.toggle('disabled', !enabled);
+                    // 更新统计
+                    const allCards = grid.querySelectorAll('.skill-card');
+                    const enabledNow = grid.querySelectorAll('input[type="checkbox"]:checked').length;
+                    statsText.innerHTML = `共 <strong>${allCards.length}</strong> 个 skill · 启用 <strong style="color:var(--green)">${enabledNow}</strong> · 禁用 <strong style="color:var(--text-4)">${allCards.length - enabledNow}</strong>`;
+                } catch (err) {
+                    showToast(String(err), 'err');
+                    e.target.checked = !enabled;
+                }
+            });
+        });
+
+        // 绑定 delete 事件
+        grid.querySelectorAll('.skill-delete').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const id = e.target.dataset.skillId;
+                if (!confirm(`确定删除 skill "${id}"？此操作不可恢复。`)) return;
+                try {
+                    await invoke('delete_skill_cmd', { id });
+                    showToast(`已删除 ${id}`, 'ok');
+                    loadSkills();
+                } catch (err) {
+                    showToast(String(err), 'err');
+                }
+            });
+        });
+    } catch (e) {
+        grid.innerHTML = `<div class="log-empty">加载失败: ${e}</div>`;
+        statsText.textContent = '加载失败';
+    }
+}
+
+$('btn-skills-enable-all')?.addEventListener('click', async () => {
+    try {
+        await invoke('toggle_all_skills', { enabled: true });
+        showToast('已全部启用', 'ok');
+        loadSkills();
+    } catch (e) {
+        showToast(String(e), 'err');
+    }
+});
+
+$('btn-skills-disable-all')?.addEventListener('click', async () => {
+    try {
+        await invoke('toggle_all_skills', { enabled: false });
+        showToast('已全部禁用', 'ok');
+        loadSkills();
+    } catch (e) {
+        showToast(String(e), 'err');
+    }
+});
+
+$('btn-skills-redeploy')?.addEventListener('click', async () => {
+    try {
+        const msg = await invoke('deploy_bridge');
+        showToast(msg, 'ok');
+    } catch (e) {
+        showToast(String(e), 'err');
+    }
 });
 
 // ── 初始化 ─────────────────────────────

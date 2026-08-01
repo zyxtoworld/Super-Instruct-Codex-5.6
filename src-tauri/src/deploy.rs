@@ -124,15 +124,49 @@ impl DeployManager {
         fs::write(&dst_bridge, bridge_md).map_err(|e| format!("write bridge.md failed: {}", e))?;
         tracing::info!("deploy: bridge.md written ({} bytes)", bridge_md.len());
 
-        // 6. 复制 skills (可选)
+        // 6. 复制 skills (可选, 只复制启用的)
         let skill_count = if let Some(skills_dir) = skills_dir {
             let dst_skills = self.codex_home.join("skills");
             if dst_skills.exists() {
                 fs::remove_dir_all(&dst_skills).map_err(|e| format!("remove old skills failed: {}", e))?;
             }
-            copy_dir_recursive(skills_dir, &dst_skills)
-                .map_err(|e| format!("copy skills failed: {}", e))?;
-            count_skills(&dst_skills)
+            fs::create_dir_all(&dst_skills).map_err(|e| format!("create skills dir failed: {}", e))?;
+
+            // 读取启用列表
+            let prefs_path = self.codex_home.join("super-instruct-skills.json");
+            let enabled_set: Option<std::collections::BTreeSet<String>> = if prefs_path.exists() {
+                fs::read_to_string(&prefs_path)
+                    .ok()
+                    .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+                    .and_then(|v| v.get("enabled").map(|e| e.clone()))
+                    .and_then(|e| serde_json::from_value(e).ok())
+            } else {
+                None // 无偏好文件 = 全部启用
+            };
+
+            let all_enabled = enabled_set.is_none();
+            let mut count = 0;
+            if let Ok(entries) = fs::read_dir(skills_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if !path.is_dir() {
+                        continue;
+                    }
+                    let id = entry.file_name().to_string_lossy().to_string();
+                    let should_copy = if all_enabled {
+                        true
+                    } else {
+                        enabled_set.as_ref().map_or(false, |s| s.contains(&id))
+                    };
+                    if should_copy {
+                        let dst = dst_skills.join(&id);
+                        copy_dir_recursive(&path, &dst)
+                            .map_err(|e| format!("copy skill '{}' failed: {}", id, e))?;
+                        count += 1;
+                    }
+                }
+            }
+            count
         } else {
             tracing::warn!("deploy: skills dir not provided, skipping skills");
             0

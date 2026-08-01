@@ -5,6 +5,7 @@ pub mod core;
 pub mod deploy;
 pub mod extensions;
 pub mod log;
+pub mod skills;
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -157,6 +158,10 @@ pub fn run() {
             get_proxy_status,
             get_codex_info,
             set_relay_url,
+            list_skills,
+            toggle_skill,
+            toggle_all_skills,
+            delete_skill_cmd,
             minimize_window,
             toggle_maximize,
             close_window,
@@ -613,6 +618,30 @@ async fn set_relay_url(url: String) -> Result<String, String> {
         .ok_or_else(|| "Codex home not found".to_string())?;
     manager.set_relay_url(&trimmed)?;
     Ok(format!("Relay URL saved: {}", trimmed))
+}
+
+// ── Skills 管理 ──────────────────────────────────────────
+
+#[tauri::command]
+async fn list_skills(app: tauri::AppHandle) -> Result<Vec<skills::SkillInfo>, String> {
+    Ok(skills::scan_skills(&app))
+}
+
+#[tauri::command]
+async fn toggle_skill(id: String, enabled: bool) -> Result<(), String> {
+    skills::toggle_skill(&id, enabled);
+    Ok(())
+}
+
+#[tauri::command]
+async fn toggle_all_skills(enabled: bool) -> Result<(), String> {
+    skills::set_all(enabled);
+    Ok(())
+}
+
+#[tauri::command]
+async fn delete_skill_cmd(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    skills::delete_skill(&app, &id)
 }
 
 // ── 窗口控制 ──────────────────────────────────────────────

@@ -43,6 +43,9 @@
             <div class="nav-item" id="nav-config">
                 <span class="nav-icon">⚙</span> 配置管理
             </div>
+            <div class="nav-item" id="nav-skills">
+                <span class="nav-icon">◈</span> Skills 管理
+            </div>
         </div>
         <div class="sidebar-section">
             <div class="sidebar-label">操作</div>
@@ -100,6 +103,16 @@
             </div>
         </div>
 
+        <!-- Skills head -->
+        <div class="main-head" id="head-skills" style="display:none;">
+            <span class="main-title">Skills 管理</span>
+            <div class="main-actions">
+                <button class="btn" id="btn-skills-enable-all">全部启用</button>
+                <button class="btn" id="btn-skills-disable-all">全部禁用</button>
+                <button class="btn btn-red" id="btn-skills-redeploy">重新部署</button>
+            </div>
+        </div>
+
         <!-- 仪表盘 -->
         <div class="main-content active" id="page-dashboard">
             <div class="dash-pad">
@@ -154,6 +167,18 @@
                     <div class="cfg-line"><div class="cfg-k">记忆记录</div><div class="cfg-v" id="cfg-memory-count">0 条成功交互</div></div>
                     <div class="cfg-line"><div class="cfg-k">代理端口</div><div class="cfg-v">127.0.0.1:8080</div></div>
                     <div class="cfg-line"><div class="cfg-k">SSE 修复</div><div class="cfg-v amber">已启用（response.completed 包装）</div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Skills 管理 -->
+        <div class="main-content" id="page-skills">
+            <div class="skills-scroll">
+                <div class="skills-stats" id="skills-stats">
+                    <span class="skills-stats-text" id="skills-stats-text">加载中…</span>
+                </div>
+                <div class="skills-grid" id="skills-grid">
+                    <div class="log-empty">加载中…</div>
                 </div>
             </div>
         </div>
