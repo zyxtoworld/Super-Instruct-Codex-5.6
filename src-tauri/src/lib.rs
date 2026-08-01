@@ -8,6 +8,7 @@ pub mod log;
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use serde::Serialize;
 use tauri::Emitter;
 use tauri::Manager;
 use tauri::menu::{Menu, MenuItem};
@@ -115,6 +116,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            preflight_check,
+            get_deploy_status,
             start_proxy,
             stop_proxy,
             deploy_bridge,
@@ -147,7 +150,13 @@ async fn start_proxy(
 
     tracing::info!("start_proxy: initializing");
 
-    // 读取 bridge.md — 文件查找失败时用编译期嵌入的 fallback
+    // 1. Codex home 硬检查 — 不存在则阻断启动
+    let manager = DeployManager::new().ok_or_else(|| {
+        tracing::error!("start_proxy: Codex home not found, aborting");
+        "Codex 配置目录未找到，无法启动代理。请确认 Codex CLI 已安装并运行过至少一次。".to_string()
+    })?;
+
+    // 2. 读取 bridge.md — 文件查找失败时用编译期嵌入的 fallback
     let instructions = match resolve_resource_file(&app, "bridge.md") {
         Ok(path) => std::fs::read_to_string(&path).unwrap_or_else(|e| {
             tracing::warn!("start_proxy: read bridge.md failed ({}), using embedded fallback", e);
@@ -159,38 +168,45 @@ async fn start_proxy(
         }
     };
 
-    // 自动部署 — 启动代理前自动修改 Codex config.toml
-    if let Some(manager) = DeployManager::new() {
-        let status = manager.status();
-        if !status.bridge_active {
-            tracing::info!("start_proxy: auto-deploying bridge.md + skills");
-            // skills 目录查找失败时降级为只部署 bridge.md
-            let skills_dir = resolve_resource_dir(&app, "skills").ok();
-            if skills_dir.is_none() {
-                tracing::warn!("start_proxy: skills dir not found, deploying bridge.md only");
+    // 3. 部署 — bridge_active 不足以判断完整部署，需验证 bridge_exists 和 relay_url_valid
+    let status = manager.status();
+    let needs_deploy = !status.bridge_active
+        || !status.bridge_exists
+        || !status.relay_url_valid;
+
+    if needs_deploy {
+        tracing::info!(
+            "start_proxy: deploying (bridge_active={}, bridge_exists={}, relay_valid={})",
+            status.bridge_active, status.bridge_exists, status.relay_url_valid
+        );
+        let skills_dir = resolve_resource_dir(&app, "codex-skills").ok();
+        if skills_dir.is_none() {
+            tracing::warn!("start_proxy: codex-skills dir not found, deploying bridge.md only");
+        }
+        match manager.apply_with_optional_skills(&instructions, skills_dir.as_deref()) {
+            Ok(msg) => tracing::info!("start_proxy: auto-deploy: {}", msg),
+            Err(e) => {
+                tracing::error!("start_proxy: auto-deploy failed: {}", e);
+                return Err(format!("Auto-deploy failed: {}", e));
             }
-            match manager.apply_with_optional_skills(&instructions, skills_dir.as_deref()) {
-                Ok(msg) => tracing::info!("start_proxy: auto-deploy: {}", msg),
-                Err(e) => {
-                    tracing::error!("start_proxy: auto-deploy failed: {}", e);
-                    return Err(format!("Auto-deploy failed: {}", e));
-                }
-            }
-        } else {
-            tracing::info!("start_proxy: already deployed, skipping auto-deploy");
         }
     } else {
-        tracing::warn!("start_proxy: Codex home not found, skipping auto-deploy");
+        tracing::info!("start_proxy: already fully deployed, skipping auto-deploy");
     }
 
-    // 自动检测中转站地址 (deploy 后从备份读取原始地址)
-    let relay_url = find_relay_url().unwrap_or_else(|| "http://127.0.0.1:57321".to_string());
+    // 4. 验证 relay URL — 无有效地址则阻断启动（防自环）
+    let relay_url = match find_relay_url() {
+        Some(url) if !url.contains("127.0.0.1:8080") => url,
+        _ => {
+            tracing::error!("start_proxy: no valid relay URL found");
+            return Err("未找到有效的中转站地址。请在配置页设置中转站 URL 后再启动代理。".into());
+        }
+    };
     let relay_url_display = relay_url.clone();
     tracing::info!("start_proxy: relay_url = {}", relay_url_display);
 
-    // 创建扩展实例 (Arc 共享 between Core 和 Tauri commands)
+    // 5. 创建扩展实例
     let monitor = Arc::new(MonitorPanel::new(app.clone()));
-    // 写入 memory.json — dev 模式写到项目根, release 模式写到 exe 同级
     let memory_path = if cfg!(debug_assertions) {
         std::env::current_dir()
             .ok()
@@ -206,12 +222,11 @@ async fn start_proxy(
     };
     let memory = Arc::new(MemoryKernel::new(&memory_path));
 
-    // 创建篡改引擎 (单实例, 用于 builder + rule_count)
     let tamper = TamperEngine::default_rules();
     let rule_count = tamper.rule_count();
     tracing::info!("start_proxy: tamper rules = {}", rule_count);
 
-    // 构建 MitmCore
+    // 6. 构建 MitmCore
     let core = Arc::new(
         MitmCore::builder()
             .target(&relay_url)
@@ -224,22 +239,30 @@ async fn start_proxy(
             .map_err(|e| e.to_string())?,
     );
 
-    // 启动 axum HTTP 服务
+    // 7. 同步绑定端口 — 失败则回滚部署，不修改 AppState
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
+        .await
+        .map_err(|e| {
+            tracing::error!("start_proxy: port 8080 bind failed, rolling back deploy: {}", e);
+            if let Some(m) = DeployManager::new() {
+                let _ = m.restore();
+            }
+            format!("端口 8080 绑定失败: {}。可能代理已在运行或端口被占用。", e)
+        })?;
+    tracing::info!("start_proxy: port 8080 bound successfully");
+
+    // 8. 启动 axum server（listener 已绑定，不会再 panic）
     let core_for_server = core.clone();
     let relay_url_for_log = relay_url_display.clone();
     let handle = tokio::spawn(async move {
         let app = axum::Router::new()
             .route("/", axum::routing::get(health_check))
             .route("/{*path}", axum::routing::any(move |req| handle_proxy(req, core_for_server.clone())));
-
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
-            .await
-            .expect("failed to bind :8080");
         tracing::info!("Proxy listening on :8080 -> {}", relay_url_for_log);
         axum::serve(listener, app).await.expect("proxy server error");
     });
 
-    // 存入 AppState
+    // 9. 存入 AppState
     *state.core.write().await = Some(core);
     *state.proxy_handle.write().await = Some(handle);
     *state.monitor.write().await = Some(monitor);
@@ -333,7 +356,7 @@ async fn deploy_bridge(app: tauri::AppHandle) -> Result<String, String> {
         }
     };
     // skills: 可选，查找失败时只部署 bridge.md
-    let skills_dir = resolve_resource_dir(&app, "skills").ok();
+    let skills_dir = resolve_resource_dir(&app, "codex-skills").ok();
     let result = manager.apply_with_optional_skills(&bridge_md, skills_dir.as_deref());
     match &result {
         Ok(msg) => tracing::info!("deploy_bridge: {}", msg),
@@ -390,6 +413,101 @@ async fn get_codex_info() -> Result<serde_json::Value, String> {
         "codex_home": home.map(|p| p.display().to_string()),
         "relay_url": relay,
     }))
+}
+
+// ── Pre-flight 检查 ─────────────────────────────────────
+
+#[derive(Clone, Serialize)]
+struct PreflightResult {
+    codex_home_found: bool,
+    codex_home_path: Option<String>,
+    relay_url: Option<String>,
+    relay_url_valid: bool,
+    port_available: bool,
+    bridge_md_readable: bool,
+    skills_found: bool,
+    errors: Vec<String>,
+}
+
+#[tauri::command]
+async fn preflight_check(app: tauri::AppHandle) -> Result<PreflightResult, String> {
+    let mut errors = Vec::new();
+
+    // 1. Codex home
+    let codex_home = DeployManager::find_codex_home();
+    let codex_home_found = codex_home.is_some();
+    let codex_home_path = codex_home.as_ref().map(|p| p.display().to_string());
+    if !codex_home_found {
+        errors.push("Codex 配置目录未找到，请确认 Codex CLI 已安装并运行过至少一次".into());
+    }
+
+    // 2. Relay URL
+    let relay_url = find_relay_url();
+    let relay_url_valid = relay_url
+        .as_ref()
+        .map(|u| !u.is_empty() && !u.contains("127.0.0.1:8080"))
+        .unwrap_or(false);
+    if !relay_url_valid {
+        errors.push("未找到有效的中转站地址，请在配置页设置中转站 URL".into());
+    }
+
+    // 3. 端口可用性 — bind 成功后立即 drop
+    let port_available = tokio::net::TcpListener::bind("127.0.0.1:8080")
+        .await
+        .is_ok();
+    if !port_available {
+        errors.push("端口 8080 被占用，可能代理已在运行".into());
+    }
+
+    // 4. bridge.md 可读性
+    let bridge_md_readable = match resolve_resource_file(&app, "bridge.md") {
+        Ok(path) => std::fs::read_to_string(&path).is_ok(),
+        Err(_) => true, // fallback 到编译期嵌入版本
+    };
+    if !bridge_md_readable {
+        errors.push("bridge.md 文件不可读".into());
+    }
+
+    // 5. codex-skills 目录
+    let skills_found = resolve_resource_dir(&app, "codex-skills").is_ok();
+    if !skills_found {
+        errors.push("codex-skills 目录未找到，将仅部署 bridge.md".into());
+    }
+
+    Ok(PreflightResult {
+        codex_home_found,
+        codex_home_path,
+        relay_url,
+        relay_url_valid,
+        port_available,
+        bridge_md_readable,
+        skills_found,
+        errors,
+    })
+}
+
+// ── 部署状态查询 ─────────────────────────────────────────
+
+#[tauri::command]
+async fn get_deploy_status() -> Result<serde_json::Value, String> {
+    match DeployManager::new() {
+        Some(manager) => {
+            let codex_home = manager.codex_home().display().to_string();
+            let status = manager.status();
+            Ok(serde_json::json!({
+                "codex_home": codex_home,
+                "bridge_active": status.bridge_active,
+                "bridge_exists": status.bridge_exists,
+                "skills_count": status.skills_count,
+                "config_backed_up": status.config_backed_up,
+                "relay_url_valid": status.relay_url_valid,
+                "codex_home_found": true,
+            }))
+        }
+        None => Ok(serde_json::json!({
+            "codex_home_found": false,
+        }))
+    }
 }
 
 #[tauri::command]

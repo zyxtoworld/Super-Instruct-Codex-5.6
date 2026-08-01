@@ -22,6 +22,16 @@
     <button class="tb-btn close" id="tb-close" title="关闭">✕</button>
 </div>
 
+<div class="preflight-modal" id="preflight-modal" style="display:none;">
+    <div class="preflight-card">
+        <div class="preflight-title">启动检查</div>
+        <div class="preflight-list" id="preflight-list"></div>
+        <div class="preflight-actions" id="preflight-actions">
+            <button class="btn" id="preflight-cancel">取消</button>
+        </div>
+    </div>
+</div>
+
 <div class="body-wrap">
     <!-- ═══ 侧边栏 ═══ -->
     <aside class="sidebar">
@@ -36,15 +46,13 @@
         </div>
         <div class="sidebar-section">
             <div class="sidebar-label">操作</div>
-            <div class="nav-item" id="nav-start-proxy">
-                <span class="nav-icon">▶</span> 启动代理
-            </div>
-            <div class="nav-item" id="nav-stop-proxy">
-                <span class="nav-icon">■</span> 停止代理
+            <div class="nav-item" id="nav-toggle-proxy">
+                <span class="nav-icon" id="toggle-icon">▶</span>
+                <span id="toggle-label">启动代理</span>
             </div>
         </div>
         <div class="sidebar-spacer"></div>
-        <div class="sidebar-status">
+        <div class="sidebar-status" id="health-panel">
             <div class="ss-row">
                 <span class="ss-label">代理状态</span>
                 <div style="display:flex;align-items:center;gap:5px;">
@@ -53,8 +61,16 @@
                 </div>
             </div>
             <div class="ss-row">
+                <span class="ss-label">Codex</span>
+                <span class="ss-val" id="ss-codex-status">--</span>
+            </div>
+            <div class="ss-row">
                 <span class="ss-label">中转站</span>
                 <span class="ss-val" id="ss-relay">--</span>
+            </div>
+            <div class="ss-row">
+                <span class="ss-label">破甲注入</span>
+                <span class="ss-val" id="ss-bridge-status">未部署</span>
             </div>
             <div class="ss-row">
                 <span class="ss-label">规则数</span>

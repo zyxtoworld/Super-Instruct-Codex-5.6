@@ -5,7 +5,7 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
-    "copy-resources": "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force src-tauri/resources/skills | Out-Null; Copy-Item bridge.md src-tauri/resources/ -Force; Copy-Item skills/* src-tauri/resources/skills/ -Recurse -Force\""
+    "copy-resources": "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force src-tauri/resources/codex-skills | Out-Null; Copy-Item bridge.md src-tauri/resources/ -Force; Copy-Item codex-skills/* src-tauri/resources/codex-skills/ -Recurse -Force\""
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2"

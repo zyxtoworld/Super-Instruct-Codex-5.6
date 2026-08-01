@@ -11,8 +11,7 @@ const el = {
     // 导航
     navDashboard:  $('nav-dashboard'),
     navConfig:     $('nav-config'),
-    navStartProxy: $('nav-start-proxy'),
-    navStopProxy:  $('nav-stop-proxy'),
+    navToggleProxy: $('nav-toggle-proxy'),
     // 标题栏按钮
     tbMinimize:    $('tb-minimize'),
     tbMaximize:    $('tb-maximize'),
@@ -77,6 +76,7 @@ function switchPage(page) {
         $('head-config').style.display = 'flex';
         refreshCodexInfo();
     }
+    updateToggleButton();
 }
 
 el.navDashboard.addEventListener('click', () => switchPage('dashboard'));
@@ -115,24 +115,72 @@ function showToast(msg, type = 'err') {
 
 // ── 代理控制 ────────────────────────────
 
-el.navStartProxy.addEventListener('click', async () => {
+el.navToggleProxy.addEventListener('click', async () => {
+    if (isRunning) {
+        await doStopProxy();
+    } else {
+        try {
+            const result = await invoke('preflight_check');
+            if (result.errors.length === 0) {
+                await doStartProxy();
+            } else {
+                showPreflight(result);
+            }
+        } catch (e) {
+            showToast(String(e), 'err');
+        }
+    }
+});
+
+async function doStartProxy() {
     try {
         const msg = await invoke('start_proxy');
         setRunning(true);
         showToast(msg, 'ok');
+        refreshHealth();
     } catch (e) {
         showToast(String(e), 'err');
+        refreshHealth();
     }
-});
+}
 
-el.navStopProxy.addEventListener('click', async () => {
+async function doStopProxy() {
     try {
         const msg = await invoke('stop_proxy');
         setRunning(false);
         showToast(msg, 'ok');
+        refreshHealth();
     } catch (e) {
         showToast(String(e), 'err');
+        refreshHealth();
     }
+}
+
+function showPreflight(result) {
+    const modal = $('preflight-modal');
+    const list = $('preflight-list');
+
+    const checks = [
+        { label: 'Codex 配置目录', pass: result.codex_home_found, detail: result.codex_home_path || '未找到' },
+        { label: '中转站地址', pass: result.relay_url_valid, detail: result.relay_url || '未设置' },
+        { label: '端口 8080 可用', pass: result.port_available, detail: result.port_available ? '空闲' : '被占用' },
+        { label: 'bridge.md 可读', pass: result.bridge_md_readable, detail: result.bridge_md_readable ? '就绪' : '不可读' },
+        { label: 'Skills 目录', pass: result.skills_found, detail: result.skills_found ? '就绪' : '未找到' },
+    ];
+
+    list.innerHTML = checks.map(c => `
+        <div class="preflight-item ${c.pass ? 'ok' : 'fail'}">
+            <span class="preflight-icon">${c.pass ? '\u2713' : '\u2717'}</span>
+            <span class="preflight-label">${c.label}</span>
+            <span class="preflight-detail">${c.detail}</span>
+        </div>
+    `).join('');
+
+    modal.style.display = 'flex';
+}
+
+$('preflight-cancel')?.addEventListener('click', () => {
+    $('preflight-modal').style.display = 'none';
 });
 
 function setRunning(running) {
@@ -140,6 +188,22 @@ function setRunning(running) {
     el.ssDot.classList.toggle('running', running);
     el.ssProxyStatus.textContent = running ? '运行中' : '已停止';
     el.ssProxyStatus.style.color = running ? 'var(--green)' : 'var(--text-3)';
+    updateToggleButton();
+}
+
+function updateToggleButton() {
+    const icon = $('toggle-icon');
+    const label = $('toggle-label');
+    const item = $('nav-toggle-proxy');
+    if (isRunning) {
+        icon.textContent = '\u25a0';
+        label.textContent = '停止代理';
+        item.classList.add('active');
+    } else {
+        icon.textContent = '\u25b6';
+        label.textContent = '启动代理';
+        item.classList.remove('active');
+    }
 }
 
 // ── 统计更新 ────────────────────────────
@@ -303,6 +367,51 @@ function showConfigMessage(msg, type) {
     }, 5000);
 }
 
+// ── 健康面板 ────────────────────────────
+
+async function refreshHealth() {
+    // Codex 环境检测
+    try {
+        const info = await invoke('get_codex_info');
+        el.ssRelay.textContent = info.relay_url ?? '--';
+
+        if (info.codex_home) {
+            $('ss-codex-status').textContent = '已检测';
+            $('ss-codex-status').style.color = 'var(--green)';
+        } else {
+            $('ss-codex-status').textContent = '未检测';
+            $('ss-codex-status').style.color = 'var(--c-crack)';
+        }
+    } catch {
+        $('ss-codex-status').textContent = '未知';
+        $('ss-codex-status').style.color = 'var(--text-3)';
+    }
+
+    // 部署状态 + 破甲注入
+    try {
+        const status = await invoke('get_deploy_status');
+        if (status.codex_home_found) {
+            const proxyRunning = isRunning;
+            if (proxyRunning && status.bridge_active) {
+                $('ss-bridge-status').textContent = '已注入';
+                $('ss-bridge-status').style.color = 'var(--green)';
+            } else if (status.bridge_exists) {
+                $('ss-bridge-status').textContent = '已部署';
+                $('ss-bridge-status').style.color = 'var(--text-2)';
+            } else {
+                $('ss-bridge-status').textContent = '未部署';
+                $('ss-bridge-status').style.color = 'var(--text-3)';
+            }
+        } else {
+            $('ss-bridge-status').textContent = 'N/A';
+            $('ss-bridge-status').style.color = 'var(--text-3)';
+        }
+    } catch {
+        $('ss-bridge-status').textContent = '未知';
+        $('ss-bridge-status').style.color = 'var(--text-3)';
+    }
+}
+
 // ── 事件订阅 ────────────────────────────
 
 listen('interaction', (event) => {
@@ -315,6 +424,7 @@ listen('stats', (event) => {
 
 listen('proxy-status', (event) => {
     setRunning(event.payload === 'running');
+    refreshHealth();
 });
 
 // ── 初始化 ─────────────────────────────
@@ -347,6 +457,9 @@ async function init() {
     } catch {
         // 忽略
     }
+
+    // 健康面板
+    refreshHealth();
 }
 
 init();

@@ -1,6 +1,7 @@
 // Deploy 模块 — Codex config.toml 备份/修改/恢复
 
 use regex::Regex;
+use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -8,11 +9,14 @@ pub struct DeployManager {
     codex_home: PathBuf,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct DeployStatus {
     pub bridge_active: bool,
     pub bridge_exists: bool,
     pub skills_count: usize,
+    pub config_backed_up: bool,
+    pub relay_url_valid: bool,
+    pub codex_home_found: bool,
 }
 
 fn home_dir() -> Option<PathBuf> {
@@ -195,10 +199,18 @@ impl DeployManager {
         let cfg = self.codex_home.join("config.toml");
         let bridge = self.codex_home.join("bridge.md");
         let skills = self.codex_home.join("skills");
+        let bak = self.codex_home.join("config.toml.super-instruct-bak");
+        let relay_file = self.codex_home.join("relay_url.txt");
 
         let bridge_active = cfg.exists() && {
             let content = fs::read_to_string(&cfg).unwrap_or_default();
             content.contains("127.0.0.1:8080")
+        };
+
+        let relay_url_valid = relay_file.exists() && {
+            let content = fs::read_to_string(&relay_file).unwrap_or_default();
+            let url = content.trim();
+            !url.is_empty() && !url.contains("127.0.0.1:8080")
         };
 
         DeployStatus {
@@ -209,6 +221,9 @@ impl DeployManager {
             } else {
                 0
             },
+            config_backed_up: bak.exists(),
+            relay_url_valid,
+            codex_home_found: true,
         }
     }
 }
@@ -242,12 +257,15 @@ pub fn find_relay_url() -> Option<String> {
         }
     }
 
-    // 3. 从当前 config.toml 读取
+    // 3. 从当前 config.toml 读取（排除代理自身地址，防自环）
     let cfg = home.join("config.toml");
     if let Ok(content) = fs::read_to_string(&cfg) {
         let re = Regex::new(r#"base_url\s*=\s*"([^"]+)""#).ok()?;
         if let Some(caps) = re.captures(&content) {
-            return caps.get(1).map(|m| m.as_str().to_string());
+            let url = caps.get(1).map(|m| m.as_str()).unwrap_or("");
+            if !url.is_empty() && !url.contains("127.0.0.1:8080") {
+                return Some(url.to_string());
+            }
         }
     }
 

@@ -45,7 +45,7 @@
     },
     "resources": {
       "resources/bridge.md": "bridge.md",
-      "resources/skills/": "skills/"
+      "resources/codex-skills/": "codex-skills/"
     }
   }
 }

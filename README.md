@@ -85,7 +85,7 @@ npx tauri build
 ```
 Super-Instruct-Codex-5.6/
 ├── bridge.md                      # 破甲指令集（注入到 system role）
-├── skills/                        # 27 个技能模块（部署到 ~/.codex/skills/）
+├── codex-skills/                  # 28 个 Codex 技能模块（部署到 ~/.codex/skills/）
 ├── frontend/
 │   ├── index.html                 # V3 浅色主题，无框窗口 + 自定义标题栏
 │   ├── styles.css                 # 类别色彩系统，960x620 紧凑布局
