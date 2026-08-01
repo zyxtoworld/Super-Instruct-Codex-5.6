@@ -22,6 +22,12 @@ impl RequestInterceptor for SystemPromptInjector {
 
     fn intercept(&self, ctx: &mut RequestCtx) {
         tracing::debug!(category = %ctx.meta.category, "inject: replacing system prompts");
+        let fields_found = inspect_request_fields(&ctx.body);
+        tracing::debug!(
+            category = %ctx.meta.category,
+            fields = ?fields_found,
+            "inject: request body field map"
+        );
         if !inject_system(&mut ctx.body, &self.instructions) {
             tracing::warn!(
                 category = %ctx.meta.category,
@@ -29,6 +35,29 @@ impl RequestInterceptor for SystemPromptInjector {
             );
         }
     }
+}
+
+/// 诊断: 列出请求 JSON 中存在的关键字段名，帮助排查 inject 是否命中
+fn inspect_request_fields(data: &serde_json::Value) -> Vec<&'static str> {
+    let mut found = Vec::new();
+    let obj = match data.as_object() {
+        Some(o) => o,
+        None => return found,
+    };
+    for (name, _) in obj {
+        match name.as_str() {
+            "instructions" => found.push("instructions"),
+            "system" => found.push("system"),
+            "system_prompt" => found.push("system_prompt"),
+            "personality" => found.push("personality"),
+            "messages" => found.push("messages"),
+            "input" => found.push("input"),
+            "model" => found.push("model"),
+            "stream" => found.push("stream"),
+            _ => {}
+        }
+    }
+    found
 }
 
 /// 递归替换所有 system role 载体为 bridge.md 内容

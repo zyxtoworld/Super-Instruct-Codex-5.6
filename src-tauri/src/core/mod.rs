@@ -84,7 +84,13 @@ impl MitmCore {
         let mut forward_headers = HeaderMap::new();
         for (name, value) in headers.iter() {
             let lower = name.as_str().to_lowercase();
-            if lower == "host" || lower == "content-length" || lower == "content-type" {
+            // 跳过 hop-by-hop 和需要重新计算的头部
+            // accept-encoding: 强制上游返回未压缩数据，否则 SSE 解析器无法读取压缩字节
+            if lower == "host"
+                || lower == "content-length"
+                || lower == "content-type"
+                || lower == "accept-encoding"
+            {
                 continue;
             }
             forward_headers.insert(name.clone(), value.clone());

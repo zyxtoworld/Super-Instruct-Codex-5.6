@@ -98,6 +98,16 @@ impl ResponseParser for UniversalSseParser {
             reply_str = thinking_str.clone();
         }
 
+        // 诊断日志: 输出解析结果预览，便于排查"破甲失败"问题
+        let reply_preview: String = reply_str.chars().take(120).collect();
+        tracing::debug!(
+            raw_len = text.len(),
+            thinking_len = thinking_str.len(),
+            reply_len = reply_str.len(),
+            reply_preview = %reply_preview,
+            "sse_parser: parse result"
+        );
+
         ParsedResponse {
             thinking: thinking_str,
             reply: reply_str,

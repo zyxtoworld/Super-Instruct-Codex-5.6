@@ -84,9 +84,28 @@ impl DeployManager {
             }
         }
 
-        // 3. 备份 config.toml（每次都刷新，确保备份的是未修改版本）
-        fs::copy(&cfg, &bak).map_err(|e| format!("backup failed: {}", e))?;
-        tracing::info!("deploy: backed up config.toml -> config.toml.super-instruct-bak");
+        // 3. 备份 config.toml — 仅当当前配置未指向代理时备份，避免备份污染
+        // 如果当前 config.toml 已包含 127.0.0.1:8080，说明上一次 deploy 的备份可能还在，
+        // 或者上次未正常退出。此时不覆盖备份，保留已有的干净版本。
+        let already_patched = content.contains("127.0.0.1:8080");
+        if !already_patched {
+            fs::copy(&cfg, &bak).map_err(|e| format!("backup failed: {}", e))?;
+            tracing::info!("deploy: backed up config.toml -> config.toml.super-instruct-bak");
+        } else if bak.exists() {
+            tracing::info!("deploy: config already patched, keeping existing clean backup");
+        } else {
+            // 已 patched 但无备份 — 极端情况：从 relay_url.txt 恢复 base_url 后再备份
+            tracing::warn!("deploy: config patched but no backup found, restoring base_url from relay_url.txt");
+            if let Ok(relay_content) = fs::read_to_string(&relay_file) {
+                let relay_url = relay_content.trim();
+                if !relay_url.is_empty() {
+                    let restored = re.replace_all(&content, format!(r#"base_url = "{}""#, relay_url));
+                    fs::write(&cfg, restored.as_ref()).map_err(|e| format!("restore base_url failed: {}", e))?;
+                    fs::copy(&cfg, &bak).map_err(|e| format!("backup failed: {}", e))?;
+                    tracing::info!("deploy: base_url restored from relay_url.txt, then backed up");
+                }
+            }
+        }
 
         // 4. 修改 base_url + 补入 model_instructions_file
         let modified = re.replace_all(&content, r#"base_url = "http://127.0.0.1:8080""#);
@@ -144,6 +163,7 @@ impl DeployManager {
                 None // 无偏好文件 = 全部启用
             };
 
+            // None = 全开; Some(空集) = 全关（用户显式禁用了所有）
             let all_enabled = enabled_set.is_none();
             let mut count = 0;
             if let Ok(entries) = fs::read_dir(skills_dir) {

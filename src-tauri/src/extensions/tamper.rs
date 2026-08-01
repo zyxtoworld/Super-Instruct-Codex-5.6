@@ -82,6 +82,11 @@ fn default_tamper_patterns() -> Vec<&'static str> {
         // P1: 英文直接拒绝
         r"(?i)I (?:can'?t|cannot|won't|will not|am (?:unable|not able) to).*?(?:assist|help|provide|generate|create|write|do that|comply|support).*?(?:bypass|license|paid|crack|patch|keygen|activation|authoriz|timer|modif|duration|penetration|pentest|exploit|hack|reverse|VIP|subscription|serial|scan|attack)",
         r"(?i)sorry.*?(?:can'?t|cannot|unable|against|policy|ethical|illegal)",
+        // P2: 英文宽泛拒绝 — 不含安全关键词的简单拒绝也拦截
+        r"(?i)I (?:can'?t|cannot|won't|will not|am (?:unable|not able) to|do not|don't) (?:help|assist|provide|create|generate|write|do|support|comply with) (?:that|this|with|you|such|the request|requests|your request)",
+        r"(?i)I'm (?:unable|not able|not willing) to (?:help|assist|provide|create|generate|write|do|comply)",
+        r"(?i)(?:unable|cannot|can'?t) to (?:help|assist|provide|create|generate|write|do|comply|support)",
+        r"(?i)I (?:can'?t|cannot|won't) (?:assist|help|provide|generate|create|write|do|support|comply)",
         // P3: AI 身份声明
         r"(?i)(as an AI|as a language model|I'm programmed|I am programmed)",
         // P3: 英文偏转

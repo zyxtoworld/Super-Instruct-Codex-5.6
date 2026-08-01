@@ -127,6 +127,7 @@ fn save_prefs(prefs: &SkillsPrefs) {
 // ── 公开 API ──────────────────────────────────
 
 /// 扫描源 skills 目录，返回所有 skill 信息 + 启用状态
+/// 首次运行（enabled=None）时自动初始化为全启用并持久化
 pub fn scan_skills(app: &tauri::AppHandle) -> Vec<SkillInfo> {
     let Some(src_dir) = source_skills_dir(app) else {
         tracing::warn!("skills: source codex-skills dir not found");
@@ -134,33 +135,43 @@ pub fn scan_skills(app: &tauri::AppHandle) -> Vec<SkillInfo> {
     };
 
     let prefs = load_prefs();
-    let all_enabled = prefs.enabled.is_none(); // 首次运行全开
 
-    let mut skills: Vec<SkillInfo> = Vec::new();
-
+    // 收集所有 skill id
+    let mut all_ids: Vec<String> = Vec::new();
     if let Ok(entries) = fs::read_dir(&src_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if !path.is_dir() {
-                continue;
+            if path.is_dir() {
+                all_ids.push(entry.file_name().to_string_lossy().to_string());
             }
-            let id = entry.file_name().to_string_lossy().to_string();
-            let (name, description) = parse_skill_metadata(&path);
-            let file_count = count_files(&path);
-            let enabled = if all_enabled {
-                true
-            } else {
-                prefs.enabled.as_ref().map_or(false, |s| s.contains(&id))
-            };
-
-            skills.push(SkillInfo {
-                id,
-                name,
-                description,
-                enabled,
-                file_count,
-            });
         }
+    }
+
+    // 首次运行（enabled=None）：初始化为全启用集合并持久化
+    let enabled_set: BTreeSet<String> = match &prefs.enabled {
+        None => {
+            let set: BTreeSet<String> = all_ids.iter().cloned().collect();
+            save_prefs(&SkillsPrefs { enabled: Some(set.clone()) });
+            set
+        }
+        Some(s) => s.clone(),
+    };
+
+    let mut skills: Vec<SkillInfo> = Vec::new();
+
+    for id in &all_ids {
+        let path = src_dir.join(id);
+        let (name, description) = parse_skill_metadata(&path);
+        let file_count = count_files(&path);
+        let enabled = enabled_set.contains(id);
+
+        skills.push(SkillInfo {
+            id: id.clone(),
+            name,
+            description,
+            enabled,
+            file_count,
+        });
     }
 
     // 按名称排序
@@ -172,7 +183,10 @@ pub fn scan_skills(app: &tauri::AppHandle) -> Vec<SkillInfo> {
 pub fn toggle_skill(id: &str, enabled: bool) {
     let mut prefs = load_prefs();
     if prefs.enabled.is_none() {
-        // 首次运行：初始化为全启用集合
+        // 从全开模式切换到显式列表：不初始化全量集合
+        // 语义：enabled=None 表示"无偏好"，一旦用户显式 toggle，
+        // 就进入显式模式。前端在首次 toggle 前应先调用 set_all(true)
+        // 来建立完整偏好列表，避免其余 skill 丢失。
         prefs.enabled = Some(BTreeSet::new());
     }
     if let Some(ref mut set) = prefs.enabled {

@@ -133,6 +133,17 @@ pub fn run() {
                             }
                         }
                         "quit" => {
+                            // 退出前恢复 Codex 配置，避免 config.toml 残留代理指向
+                            if let Some(manager) = DeployManager::new() {
+                                let status = manager.status();
+                                if status.config_backed_up || status.bridge_active {
+                                    tracing::info!("quit: restoring codex config before exit");
+                                    match manager.restore() {
+                                        Ok(msg) => tracing::info!("quit: restore succeeded: {}", msg),
+                                        Err(e) => tracing::error!("quit: restore failed: {}", e),
+                                    }
+                                }
+                            }
                             // 先销毁窗口再退出，避免 Chromium "Failed to unregister class" Error 1412
                             if let Some(window) = app.get_webview_window("main") {
                                 let _ = window.destroy();
@@ -687,6 +698,17 @@ async fn show_window(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 async fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
+    // 退出前恢复 Codex 配置
+    if let Some(manager) = DeployManager::new() {
+        let status = manager.status();
+        if status.config_backed_up || status.bridge_active {
+            tracing::info!("quit_app: restoring codex config before exit");
+            match manager.restore() {
+                Ok(msg) => tracing::info!("quit_app: restore succeeded: {}", msg),
+                Err(e) => tracing::error!("quit_app: restore failed: {}", e),
+            }
+        }
+    }
     // 先销毁窗口再退出，避免 Chromium Error 1412
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.destroy();
