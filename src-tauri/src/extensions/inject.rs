@@ -22,7 +22,12 @@ impl RequestInterceptor for SystemPromptInjector {
 
     fn intercept(&self, ctx: &mut RequestCtx) {
         tracing::debug!(category = %ctx.meta.category, "inject: replacing system prompts");
-        inject_system(&mut ctx.body, &self.instructions);
+        if !inject_system(&mut ctx.body, &self.instructions) {
+            tracing::warn!(
+                category = %ctx.meta.category,
+                "inject: no system prompt field found, injection may have no effect"
+            );
+        }
     }
 }
 

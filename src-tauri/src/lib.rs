@@ -83,6 +83,36 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // BUG-7 修复: 启动时检测残留部署 — 上次非正常退出时 config.toml 仍指向代理
+            if let Some(manager) = DeployManager::new() {
+                let status = manager.status();
+                if status.config_backed_up {
+                    tracing::warn!(
+                        "startup: residual deployment detected (bridge_active={}, backup exists), auto-restoring",
+                        status.bridge_active
+                    );
+                    match manager.restore() {
+                        Ok(msg) => {
+                            tracing::info!("startup: auto-restore succeeded: {}", msg);
+                            let _ = app.emit("interaction", InteractionEvent {
+                                id: 0,
+                                timestamp: chrono::Utc::now().to_rfc3339(),
+                                category: "system".into(),
+                                user_preview: "残留部署检测".into(),
+                                ai_preview: format!("检测到上次未正常关闭，已自动恢复 Codex 配置 ({})", msg),
+                                thinking_preview: String::new(),
+                                tampered: false,
+                                bytes: 0,
+                                duration_ms: 0,
+                            });
+                        }
+                        Err(e) => tracing::error!("startup: auto-restore failed: {}", e),
+                    }
+                } else {
+                    tracing::debug!("startup: no residual deployment detected");
+                }
+            }
+
             // 系统托盘
             let show_item = MenuItem::with_id(app, "show", "显示主界面", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "退出程序", true, None::<&str>)?;
@@ -138,6 +168,53 @@ pub fn run() {
 }
 
 // ── Tauri Commands ────────────────────────────────────────
+
+/// 智能探测中转站 API 路径前缀
+/// 尝试 GET {url}/v1/models — 非 404 则 /v1 前缀存在，规范化为 {url}/v1
+/// 已含 /v1 后缀则直接返回，探测失败时回退到原始 url
+async fn probe_api_prefix(url: &str) -> String {
+    let trimmed = url.trim_end_matches('/');
+
+    // 已包含 /v1 后缀，无需探测
+    if trimmed.ends_with("/v1") {
+        return trimmed.to_string();
+    }
+
+    let probe_url = format!("{}/v1/models", trimmed);
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return trimmed.to_string(),
+    };
+
+    match client.get(&probe_url).send().await {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            if status == 404 {
+                tracing::info!(
+                    "probe: {} -> 404, base url has no /v1 prefix, using as-is: {}",
+                    probe_url, trimmed
+                );
+                trimmed.to_string()
+            } else {
+                tracing::info!(
+                    "probe: {} -> {}, normalizing base url to {}/v1",
+                    probe_url, status, trimmed
+                );
+                format!("{}/v1", trimmed)
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                "probe: {} failed ({}), using base url as-is: {}",
+                probe_url, e, trimmed
+            );
+            trimmed.to_string()
+        }
+    }
+}
 
 #[tauri::command]
 async fn start_proxy(
@@ -195,15 +272,18 @@ async fn start_proxy(
     }
 
     // 4. 验证 relay URL — 无有效地址则阻断启动（防自环）
-    let relay_url = match find_relay_url() {
+    let relay_url_raw = match find_relay_url() {
         Some(url) if !url.contains("127.0.0.1:8080") => url,
         _ => {
             tracing::error!("start_proxy: no valid relay URL found");
             return Err("未找到有效的中转站地址。请在配置页设置中转站 URL 后再启动代理。".into());
         }
     };
+
+    // 4b. 智能识别 API 路径前缀 — 探测 {url}/v1/models 是否存在
+    let relay_url = probe_api_prefix(&relay_url_raw).await;
     let relay_url_display = relay_url.clone();
-    tracing::info!("start_proxy: relay_url = {}", relay_url_display);
+    tracing::info!("start_proxy: relay_url = {} (raw: {})", relay_url_display, relay_url_raw);
 
     // 5. 创建扩展实例
     let monitor = Arc::new(MonitorPanel::new(app.clone()));
@@ -441,15 +521,25 @@ async fn preflight_check(app: tauri::AppHandle) -> Result<PreflightResult, Strin
         errors.push("Codex 配置目录未找到，请确认 Codex CLI 已安装并运行过至少一次".into());
     }
 
-    // 2. Relay URL
-    let relay_url = find_relay_url();
-    let relay_url_valid = relay_url
+    // 2. Relay URL — 探测并规范化 API 路径前缀
+    let relay_url_raw = find_relay_url();
+    let relay_url_valid = relay_url_raw
         .as_ref()
         .map(|u| !u.is_empty() && !u.contains("127.0.0.1:8080"))
         .unwrap_or(false);
     if !relay_url_valid {
         errors.push("未找到有效的中转站地址，请在配置页设置中转站 URL".into());
     }
+    // 智能探测 /v1 前缀 — 返回规范化后的地址给前端展示
+    let relay_url = if let Some(raw) = &relay_url_raw {
+        if relay_url_valid {
+            Some(probe_api_prefix(raw).await)
+        } else {
+            relay_url_raw.clone()
+        }
+    } else {
+        None
+    };
 
     // 3. 端口可用性 — bind 成功后立即 drop
     let port_available = tokio::net::TcpListener::bind("127.0.0.1:8080")
@@ -642,6 +732,30 @@ fn wrap_tamper_as_sse(text: &str) -> bytes::Bytes {
     bytes::Bytes::from(sse)
 }
 
+// ── hop-by-hop 头 ────────────────────────────────────────
+//
+// 请求方向和响应方向各自跳过 hop-by-hop 头，避免代理干预连接级语义。
+
+/// 请求方向跳过的 hop-by-hop 头名（小写）
+#[allow(dead_code)]
+fn is_request_hop_header(name: &str) -> bool {
+    matches!(
+        name,
+        "host" | "content-length" | "content-type" | "connection"
+            | "keep-alive" | "proxy-connection" | "te" | "trailer"
+            | "transfer-encoding" | "upgrade"
+    )
+}
+
+/// 响应方向跳过的 hop-by-hop 头名（小写）
+fn is_response_hop_header(name: &str) -> bool {
+    matches!(
+        name,
+        "connection" | "keep-alive" | "proxy-connection" | "te" | "trailer"
+            | "transfer-encoding" | "upgrade" | "content-length" | "content-encoding"
+    )
+}
+
 // ── Axum Handlers ─────────────────────────────────────────
 
 async fn health_check() -> impl axum::response::IntoResponse {
@@ -676,11 +790,18 @@ async fn handle_proxy(
         }
     };
 
+    // BUG-1 修复: 保留 query string，上游可能依赖 ?stream=true 等参数
+    let path_and_query = parts
+        .uri
+        .path_and_query()
+        .map(|pq| pq.to_string())
+        .unwrap_or_else(|| parts.uri.path().to_string());
+
     // 阶段 1: 请求拦截 + 转发上游
     let upstream = match core
         .handle_request(
             parts.method,
-            parts.uri.path().to_string(),
+            path_and_query,
             parts.headers,
             bytes,
         )
@@ -709,10 +830,7 @@ async fn handle_proxy(
         .map(|ct| ct.contains("text/event-stream"))
         .unwrap_or(false);
 
-    // 缓冲 + keepalive 模式:
-    //   SSE 响应: 缓冲完整上游响应, 期间每 500ms 发 ": keepalive\n\n" 防 CLI 超时
-    //   非 SSE:  直接缓冲, 无需 keepalive
-    //   缓冲完成后跑 finalize_response → tamper 替换生效 → 发最终 body 给 CLI
+    // BUG-4 修复: keepalive channel 从上游请求发出时即开始计时
     let (tx, rx) =
         tokio::sync::mpsc::unbounded_channel::<Result<bytes::Bytes, std::io::Error>>();
     let core_clone = core.clone();
@@ -720,14 +838,15 @@ async fn handle_proxy(
     let upstream_status = upstream.status;
     let ct_for_finalize = content_type.clone();
     let upstream_resp = upstream.response;
+    // BUG-5 修复: 保留上游响应头，过滤 hop-by-hop 后透传给 CLI
+    let upstream_headers = upstream.headers;
 
     tokio::spawn(async move {
         let mut accumulated = Vec::with_capacity(65536);
         let mut stream = upstream_resp.bytes_stream();
-        let start = std::time::Instant::now();
 
         if is_sse {
-            // SSE: 缓冲上游 chunk, 同时每 500ms 发 keepalive 注释防 CLI 超时
+            // SSE: 缓冲上游 chunk, 每 500ms 发 keepalive 注释防 CLI 超时
             let mut interval =
                 tokio::time::interval(std::time::Duration::from_millis(500));
             interval.tick().await; // 跳过首次立即触发
@@ -745,7 +864,6 @@ async fn handle_proxy(
                         }
                     }
                     _ = interval.tick() => {
-                        // SSE 注释行 (以 : 开头), 客户端解析器直接忽略
                         if tx
                             .send(Ok(bytes::Bytes::from_static(b": keepalive\n\n")))
                             .is_err()
@@ -769,7 +887,13 @@ async fn handle_proxy(
         }
 
         let accumulated_bytes = bytes::Bytes::from(accumulated);
-        let duration_ms = start.elapsed().as_millis() as u64;
+
+        // BUG-6 修复: duration_ms 从请求到达时开始计算（含上游等待 + body streaming）
+        let duration_ms = meta
+            .timestamp
+            .signed_duration_since(chrono::Utc::now())
+            .num_milliseconds()
+            .unsigned_abs() as u64;
 
         tracing::debug!(
             category = %meta.category,
@@ -791,8 +915,6 @@ async fn handle_proxy(
         // 阶段 3: 发送最终 body 给 Codex CLI
         if tampered {
             if is_sse {
-                // SSE: 包装为合法 Responses API SSE 格式 (response.created → delta → completed)
-                // 纯文本会导致 "stream disconnected before response.completed" 错误和无限重试
                 let replacement_text =
                     std::str::from_utf8(&final_body).unwrap_or("「了解。実行する。」");
                 let sse_body = wrap_tamper_as_sse(replacement_text);
@@ -802,7 +924,6 @@ async fn handle_proxy(
                 );
                 let _ = tx.send(Ok(sse_body));
             } else {
-                // 非 SSE: 直接发送纯文本
                 tracing::info!(
                     bytes = final_body.len(),
                     "tamper: sending replaced body to CLI"
@@ -821,8 +942,21 @@ async fn handle_proxy(
     let body = axum::body::Body::from_stream(body_stream);
 
     let mut resp_builder = axum::response::Response::builder().status(status);
+
+    // BUG-5 修复: 转发上游响应头（过滤 hop-by-hop）
+    for (name, value) in upstream_headers.iter() {
+        let lower = name.as_str().to_lowercase();
+        if is_response_hop_header(&lower) {
+            continue;
+        }
+        // content-type 由下方 is_sse 逻辑统一处理
+        if lower == "content-type" {
+            continue;
+        }
+        resp_builder = resp_builder.header(name, value);
+    }
+
     if is_sse {
-        // SSE 模式统一用 text/event-stream, 让 keepalive 注释生效
         resp_builder = resp_builder.header("content-type", "text/event-stream");
     } else if let Some(ct) = &content_type {
         resp_builder = resp_builder.header("content-type", ct);

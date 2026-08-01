@@ -29,6 +29,7 @@ pub struct UpstreamResult {
     pub meta: RequestMeta,
     pub status: u16,
     pub content_type: Option<String>,
+    pub headers: HeaderMap,
     pub response: reqwest::Response,
 }
 
@@ -42,7 +43,7 @@ impl MitmCore {
     pub async fn handle_request(
         &self,
         method: Method,
-        path: String,
+        path_and_query: String,
         headers: HeaderMap,
         body: Bytes,
     ) -> Result<UpstreamResult, Box<dyn std::error::Error + Send + Sync>> {
@@ -53,7 +54,7 @@ impl MitmCore {
 
         tracing::debug!(
             category = %category,
-            path = %path,
+            path = %path_and_query,
             method = %method,
             user_msg_len = user_msg.len(),
             "request received"
@@ -63,7 +64,7 @@ impl MitmCore {
             meta: RequestMeta {
                 user_msg,
                 category,
-                path: path.clone(),
+                path: path_and_query.clone(),
                 timestamp: chrono::Utc::now(),
             },
             headers: headers.clone(),
@@ -77,7 +78,7 @@ impl MitmCore {
         }
 
         // 3. 转发到上游 — 跳过 hop-by-hop 头
-        let url = format!("{}{}", self.target, path);
+        let url = format!("{}{}", self.target, path_and_query);
         tracing::debug!(url = %url, "forwarding to upstream");
 
         let mut forward_headers = HeaderMap::new();
@@ -106,10 +107,13 @@ impl MitmCore {
 
         tracing::debug!(status, "upstream response headers received");
 
+        let headers = resp.headers().clone();
+
         Ok(UpstreamResult {
             meta: req_ctx.meta,
             status,
             content_type,
+            headers,
             response: resp,
         })
     }

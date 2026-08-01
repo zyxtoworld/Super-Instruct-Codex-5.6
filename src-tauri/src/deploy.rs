@@ -89,7 +89,7 @@ impl DeployManager {
         tracing::info!("deploy: backed up config.toml -> config.toml.super-instruct-bak");
 
         // 4. 修改 base_url + 补入 model_instructions_file
-        let modified = re.replace_all(&content, r#"base_url = "http://127.0.0.1:8080/v1""#);
+        let modified = re.replace_all(&content, r#"base_url = "http://127.0.0.1:8080""#);
 
         // model_instructions_file: 若已存在则替换，否则在 model = 行后插入，都没有则追加
         let instructions_line = r#"model_instructions_file = "./bridge.md""#;
