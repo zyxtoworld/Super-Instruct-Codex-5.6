@@ -68,13 +68,11 @@ impl ResponseInterceptor for TamperEngine {
         // 空响应兜底: 敏感类别(crack/reverse/pentest)的请求收到空回复 = 静默拒绝
         // (pro 额度耗尽 / 模型安全过滤 / 截断),没有拒绝文本可匹配正则。
         // 兜底为 Rei Protocol 替换,避免用户拿到空壳。
-        // 仅对成功状态(2xx/3xx)生效: 4xx/5xx 是上游真实错误(401/429/500 等),
-        // 必须原样透传,否则会掩盖密钥错误/额度耗尽等真实故障。
         let is_sensitive = matches!(
             ctx.meta.category,
             crate::core::Category::Crack | crate::core::Category::Reverse | crate::core::Category::Pentest
         );
-        if is_sensitive && ctx.status < 400 && combined.trim().is_empty() {
+        if is_sensitive && combined.trim().is_empty() {
             tracing::info!(
                 category = %ctx.meta.category,
                 "tamper: empty response on sensitive request, fallback to Rei Protocol"
