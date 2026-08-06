@@ -1,0 +1,8 @@
+.git
+.gitignore
+target
+**/target
+data
+*.log
+.reasonix
+.cursorignore

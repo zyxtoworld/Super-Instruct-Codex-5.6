@@ -1,0 +1,26 @@
+services:
+  super-instruct:
+    # 镜像由 GitHub Actions 多架构构建并发布到 GHCR(见 .github/workflows/build-and-publish.yml)
+    image: ghcr.io/zyxtoworld/super-instruct-codex-5.6:main
+    container_name: super-instruct
+    # 映射到宿主 8080（对外），容器内 LISTEN_ADDR=0.0.0.0:8080
+    ports:
+      - "8080:8080"
+    environment:
+      # 出站（默认）上游：本服务改造后转发到这里。
+      # 典型链路：client → 入口中转站 → 本服务(改造) → 此出站。
+      # 若需强制指定出站 URL，可用请求头 X-Upstream-Base 动态覆盖（优先于此处）。
+      UPSTREAM_BASE_URL: "${UPSTREAM_BASE_URL:-https://api.example.com/v1}"
+      # 可选：入站未带 Authorization 时兜底注入的出站 key（一般不需要，透传即可）
+      UPSTREAM_API_KEY: "${UPSTREAM_API_KEY:-}"
+      # 入站认证（可选；设了才校验入站 Authorization。默认不认证 = 纯改造转发）
+      AUTH_API_KEY: "${AUTH_API_KEY:-}"
+      # 指令集 path（挂载进 /data，便于线上热更新；缺失则用镜像内编译期嵌入）
+      BRIDGE_MD_PATH: "/data/bridge.md"
+      MEMORY_PATH: "/data/memory.json"
+      LOG_DIR: "/data/logs"
+      LISTEN_ADDR: "0.0.0.0:8080"
+      RUST_LOG: "info"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
