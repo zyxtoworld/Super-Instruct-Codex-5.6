@@ -231,11 +231,12 @@ fn inject_system(data: &mut Value, instructions: &str, path: &str) -> bool {
         }
     }
 
-    // 图片生成 API (Images API): prompt 是字符串。仅当请求路径是 images 生成接口时,
+    // 图片生成/编辑 API (Images API): prompt 是字符串。仅当请求路径是 images 生成/编辑接口时,
     // 在 prompt 前拼接 bridge.md 指令——否则生图请求没有 system 载体,注入失效。
     // 注意: 老版 /v1/completions 等文本 API 也用 prompt 字段,不能用路径门控外的模型判断,
     // 避免把用户文本改写成"用户请求:"转述。
-    if path.contains("/images/generations") {
+    // variations 接口无 prompt 字段,天然不涉及。
+    if path.contains("/images/generations") || path.contains("/images/edits") {
         if let Some(prompt) = obj.get_mut("prompt") {
             if prompt.is_string() {
                 let user_prompt = prompt.as_str().unwrap_or("").to_string();

@@ -19,8 +19,6 @@ pub struct Config {
     pub default_upstream: Option<Upstream>,
     /// 动态上游列表（按 model 前缀匹配，key 匹配 model 则用其 url）
     pub upstreams: Vec<Upstream>,
-    /// 入站认证 key (Bearer / x-api-key)。空 = 不认证（仅内网）
-    pub auth_api_key: Option<String>,
     /// bridge.md 路径（缺失时用编译期嵌入）
     pub bridge_md_path: Option<PathBuf>,
     /// memory.json 路径
@@ -32,10 +30,9 @@ fn env(name: &str) -> Option<String> {
 }
 
 /// 解析上游字符串格式：
-///   - 单值:  "https://api.openai.com/v1"
-///   - 键值:  "openai=https://api.openai.com/v1"
+/// 单值: `https://api.openai.com/v1`;键值: `openai=https://api.openai.com/v1`。
 /// 多个上游用分号分隔。每个条目可用 `|key=<b64>` 附加 api_key，
-/// 或将整个条目写成 `key=url`，api_key 由分离的 UPSTREAM_<KEY>_KEY 或统一键提供。
+/// 或将整个条目写成 `key=url`，api_key 由分离的 `UPSTREAM_<KEY>_KEY` 或统一键提供。
 pub fn parse_config() -> Config {
     let listen_addr = env("LISTEN_ADDR").unwrap_or_else(|| "0.0.0.0:8080".into());
 
@@ -77,7 +74,6 @@ pub fn parse_config() -> Config {
         default_upstream = Some(first);
     }
 
-    let auth_api_key = env("AUTH_API_KEY");
     let bridge_md_path = env("BRIDGE_MD_PATH").map(PathBuf::from);
     let memory_path = env("MEMORY_PATH")
         .map(PathBuf::from)
@@ -87,7 +83,6 @@ pub fn parse_config() -> Config {
         listen_addr,
         default_upstream,
         upstreams,
-        auth_api_key,
         bridge_md_path,
         memory_path,
     }

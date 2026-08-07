@@ -1,7 +1,6 @@
 // super-instruct-server — 无头服务器入口
-// 组装 MitmCore + 破甲扩展 + 动态上游路由 + 认证，启动 axum on LISTEN_ADDR
+// 组装 MitmCore + 破甲扩展 + 动态上游路由，启动 axum on LISTEN_ADDR
 
-mod auth;
 mod config;
 mod proxy;
 mod router;
@@ -18,11 +17,11 @@ use super_instruct_server::extensions::sse_parser::UniversalSseParser;
 use super_instruct_server::extensions::tamper::TamperEngine;
 use super_instruct_server::BRIDGE_MD_FALLBACK;
 
-/// 全局共享状态：认证 key + monitor
+/// 全局共享状态：monitor + memory
 #[derive(Clone)]
 pub struct AppState {
-    pub auth_key: Option<String>,
     pub monitor: Arc<MonitorPanel>,
+    pub memory: Arc<MemoryKernel>,
 }
 
 fn init_tracing() {
@@ -72,13 +71,6 @@ async fn main() {
     let cfg = config::parse_config();
     tracing::info!("listen_addr = {}", cfg.listen_addr);
 
-    if let Some(k) = &cfg.auth_api_key {
-        tracing::info!("auth: API key authentication enabled (AUTH_API_KEY set)");
-        let _ = k;
-    } else {
-        tracing::warn!("auth: AUTH_API_KEY not set — accepting unauthenticated requests (pure transform/forward proxy)");
-    }
-
     let Some(default_upstream) = cfg.default_upstream.clone() else {
         tracing::error!(
             "No upstream configured. Set UPSTREAMS (e.g. UPSTREAMS='openai=https://api.openai.com/v1;relay=https://my-relay/v1') or UPSTREAM_BASE_URL."
@@ -123,21 +115,17 @@ async fn main() {
 
     // axum 路由
     let app_state = AppState {
-        auth_key: cfg.auth_api_key.clone(),
         monitor: monitor.clone(),
+        memory: memory.clone(),
     };
 
-    // 需认证的路由先注册 + route_layer，最后统一 with_state 收尾
+    // 所有路由免认证（纯改造转发网关，认证由部署层反代/Nginx 负责）
     let app = axum::Router::new()
         .route("/stats", axum::routing::get(stats_handler))
         .route("/history", axum::routing::get(history_handler))
-        .route("/{*path}", axum::routing::any(move |req| proxy::handle_proxy(req, core.clone())))
-        .route_layer(axum::middleware::from_fn_with_state(
-            app_state.clone(),
-            auth::require_auth,
-        ));
+        .route("/{*path}", axum::routing::any(move |req| proxy::handle_proxy(req, core.clone())));
 
-    // 健康检查免认证（先 with_state 再追加路由，避免状态被消费）
+    // 健康检查/统计路由（先 with_state 再追加路由，避免状态被消费）
     let app = axum::Router::new()
         .merge(app)
         .route("/", axum::routing::get(proxy::health_check))
@@ -168,7 +156,10 @@ async fn main() {
 async fn stats_handler(
     axum::extract::State(state): axum::extract::State<AppState>,
 ) -> axum::Json<StatsEvent> {
-    axum::Json(state.monitor.get_stats())
+    let mut stats = state.monitor.get_stats();
+    // memory_count 由 MemoryKernel 实际记录数填充（monitor 与 memory 解耦）
+    stats.memory_count = state.memory.success_count();
+    axum::Json(stats)
 }
 
 async fn history_handler(

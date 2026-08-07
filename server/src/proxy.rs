@@ -115,11 +115,10 @@ pub async fn handle_proxy(
         }
         let bytes = bytes::Bytes::from(accumulated);
 
-        let duration_ms = meta
-            .timestamp
-            .signed_duration_since(chrono::Utc::now())
+        let duration_ms = chrono::Utc::now()
+            .signed_duration_since(meta.timestamp)
             .num_milliseconds()
-            .unsigned_abs() as u64;
+            .max(0) as u64;
 
         tracing::debug!(
             category = %meta.category,
@@ -199,11 +198,10 @@ pub async fn handle_proxy(
 
         let accumulated_bytes = bytes::Bytes::from(accumulated);
 
-        let duration_ms = meta
-            .timestamp
-            .signed_duration_since(chrono::Utc::now())
+        let duration_ms = chrono::Utc::now()
+            .signed_duration_since(meta.timestamp)
             .num_milliseconds()
-            .unsigned_abs() as u64;
+            .max(0) as u64;
 
         tracing::debug!(
             category = %meta.category,

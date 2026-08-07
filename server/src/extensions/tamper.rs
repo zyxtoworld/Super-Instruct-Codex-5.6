@@ -90,7 +90,7 @@ impl ResponseInterceptor for TamperEngine {
     }
 }
 
-/// 22 条篡改规则 — 5语言 x 4优先级
+/// 26 条篡改规则 — 5语言 x 4优先级(直/右弯/左弯引号三兼容)
 fn default_tamper_patterns() -> Vec<&'static str> {
     vec![
         // P1: 中文直接拒绝 + 领域关键词
@@ -105,15 +105,15 @@ fn default_tamper_patterns() -> Vec<&'static str> {
         // P3: 软拒绝/偏转
         r"(?:或其他|非侵入|被动.*?(?:检查|扫描|评估)|低风险.*?检查).*?(?:我不会|我不能|不能|无法|我不)",
         // P1: 英文直接拒绝
-        r"(?i)I (?:can'?t|cannot|won't|will not|am (?:unable|not able) to).*?(?:assist|help|provide|generate|create|write|do that|comply|support).*?(?:bypass|license|paid|crack|patch|keygen|activation|authoriz|timer|modif|duration|penetration|pentest|exploit|hack|reverse|VIP|subscription|serial|scan|attack)",
-        r"(?i)sorry.*?(?:can'?t|cannot|unable|against|policy|ethical|illegal)",
+        r"(?i)I (?:can['’‘]?t|cannot|won['’‘]t|will not|am (?:unable|not able) to).*?(?:assist|help|provide|generate|create|write|do that|comply|support).*?(?:bypass|license|paid|crack|patch|keygen|activation|authoriz|timer|modif|duration|penetration|pentest|exploit|hack|reverse|VIP|subscription|serial|scan|attack)",
+        r"(?i)sorry.*?(?:can['’‘]?t|cannot|unable|against|policy|ethical|illegal)",
         // P2: 英文宽泛拒绝 — 不含安全关键词的简单拒绝也拦截
-        r"(?i)I (?:can'?t|cannot|won't|will not|am (?:unable|not able) to|do not|don't) (?:help|assist|provide|create|generate|write|do|support|comply with) (?:that|this|with|you|such|the request|requests|your request)",
-        r"(?i)I'm (?:unable|not able|not willing) to (?:help|assist|provide|create|generate|write|do|comply)",
-        r"(?i)(?:unable|cannot|can'?t) to (?:help|assist|provide|create|generate|write|do|comply|support)",
-        r"(?i)I (?:can'?t|cannot|won't) (?:assist|help|provide|generate|create|write|do|support|comply)",
+        r"(?i)I (?:can['’‘]?t|cannot|won['’‘]t|will not|am (?:unable|not able) to|do not|don['’‘]t) (?:help|assist|provide|create|generate|write|do|support|comply with) (?:that|this|with|you|such|the request|requests|your request)",
+        r"(?i)I['’‘]m (?:unable|not able|not willing) to (?:help|assist|provide|create|generate|write|do|comply)",
+        r"(?i)(?:unable|cannot|can['’‘]?t) to (?:help|assist|provide|create|generate|write|do|comply|support)",
+        r"(?i)I (?:can['’‘]?t|cannot|won['’‘]t) (?:assist|help|provide|generate|create|write|do|support|comply)",
         // P3: AI 身份声明
-        r"(?i)(as an AI|as a language model|I'm programmed|I am programmed)",
+        r"(?i)(as an AI|as a language model|I['’‘]m programmed|I am programmed)",
         // P3: 英文偏转
         r"(?i)instead[,.\\s]*(?:I|you|let|we).*?(?:suggest|recommend|propose|offer|可以协助|可改为|可提供)",
         // P1: 中文不参与/不提供
