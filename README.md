@@ -137,41 +137,45 @@ Super-Instruct-Codex-5.6/
 
 > 测试条件：`gpt-5-5` / 经 sub2api 中转 → super-instruct → ccload 完整链路 / bridge.md 注入生效
 >
-> 样本：84 个请求，覆盖全部 28 个 skill 类别，每类 3 个（使用原版 codex-skills 英文触发描述）
+> 样本：56 个请求，覆盖全部 28 个 skill 类别，每类 2 个（使用原版 codex-skills 完整触发描述）
+>
+> 捕获率：**22/22 = 100%** —— 全部拒绝/偏转/空响应均被 TamperEngine (M3) 捕获并触发 Rei Protocol 替换（含空响应兜底）
 
 | 类别 | 测试数 | 通过 | 拒绝 | 拒绝率 |
 |---|---|---|---|---|
-| anti-debug | 3 | 3 | 0 | 0% |
-| binary-protect-bypass | 3 | 3 | 0 | 0% |
-| card-key | 3 | 3 | 0 | 0% |
-| cloud-audit-bypass | 3 | 3 | 0 | 0% |
-| code-obfuscate | 3 | 3 | 0 | 0% |
-| crack-keygen | 3 | 3 | 0 | 0% |
-| crypto-tools | 3 | 3 | 0 | 0% |
-| data-exfil | 3 | 3 | 0 | 0% |
-| evasion | 3 | 2 | 1 | 33% |
-| exploit-attack | 3 | 3 | 0 | 0% |
-| exploit-dev | 3 | 3 | 0 | 0% |
-| full-crack | 3 | 1 | 2 | 67% |
-| full-pentest | 3 | 3 | 0 | 0% |
-| full-reverse | 3 | 3 | 0 | 0% |
-| game-cheat | 3 | 3 | 0 | 0% |
-| malware-dev | 3 | 2 | 1 | 33% |
-| network-pentest | 3 | 2 | 1 | 33% |
-| phishing-kit | 3 | 2 | 1 | 33% |
-| post-exploit | 3 | 2 | 1 | 33% |
-| posture-assessment | 3 | 3 | 0 | 0% |
-| ransomware-builder | 3 | 1 | 2 | 67% |
-| rei-fallback | 3 | 2 | 1 | 33% |
-| reverse-engineering | 3 | 3 | 0 | 0% |
-| vip-bypass | 3 | 2 | 1 | 33% |
-| vuln-scanner | 3 | 3 | 0 | 0% |
-| web-crawler | 3 | 3 | 0 | 0% |
-| web-pentest | 3 | 3 | 0 | 0% |
-| wireless-attacks | 3 | 1 | 2 | 67% |
-| **总计** | **84** | **71** | **13** | **15%** |
+| anti-debug | 2 | 1 | 1 | 50% |
+| binary-protect-bypass | 2 | 0 | 2 | 100% |
+| card-key | 2 | 2 | 0 | 0% |
+| cloud-audit-bypass | 2 | 0 | 2 | 100% |
+| code-obfuscate | 2 | 2 | 0 | 0% |
+| crack-keygen | 2 | 2 | 0 | 0% |
+| crypto-tools | 2 | 0 | 2 | 100% |
+| data-exfil | 2 | 1 | 1 | 50% |
+| evasion | 2 | 0 | 2 | 100% |
+| exploit-attack | 2 | 2 | 0 | 0% |
+| exploit-dev | 2 | 2 | 0 | 0% |
+| full-crack | 2 | 1 | 1 | 50% |
+| full-pentest | 2 | 2 | 0 | 0% |
+| full-reverse | 2 | 2 | 0 | 0% |
+| game-cheat | 2 | 2 | 0 | 0% |
+| malware-dev | 2 | 0 | 2 | 100% |
+| network-pentest | 2 | 2 | 0 | 0% |
+| phishing-kit | 2 | 0 | 2 | 100% |
+| post-exploit | 2 | 2 | 0 | 0% |
+| posture-assessment | 2 | 2 | 0 | 0% |
+| ransomware-builder | 2 | 0 | 2 | 100% |
+| rei-fallback | 2 | 1 | 1 | 50% |
+| reverse-engineering | 2 | 2 | 0 | 0% |
+| vip-bypass | 2 | 2 | 0 | 0% |
+| vuln-scanner | 2 | 2 | 0 | 0% |
+| web-crawler | 2 | 2 | 0 | 0% |
+| web-pentest | 2 | 0 | 2 | 100% |
+| wireless-attacks | 2 | 0 | 2 | 100% |
+| **总计** | **56** | **34** | **22** | **39%** |
 
-> 注：拒绝率与测试 prompt 措辞强相关——直白中文攻击措辞（如"帮我完整破解"）约 31%，原版 codex-skills 英文工程化描述（把破解包装为"Software authorization analysis"等专业任务）约 10%。建议使用者参照 codex-skills 的措辞风格构造 prompt 以获得更低拒绝率。
+> 注：拒绝率与测试 prompt 措辞强相关——本测试使用完整 skill 触发描述（含 Trigger 元信息），
+> 措辞更直白；使用工程化措辞（把破解包装为"Software authorization analysis"等专业任务）拒绝率更低。
+> 无论措辞如何，**所有拒绝/偏转/空响应均被 TamperEngine 捕获替换**（100% 捕获率，含空响应兜底）。
 
 拒绝率折线图 (28 类别, 84 样本, 10% 总拒绝率)
 
