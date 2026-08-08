@@ -124,12 +124,15 @@ async fn main() {
     let app = axum::Router::new()
         .route("/stats", axum::routing::get(stats_handler))
         .route("/history", axum::routing::get(history_handler))
-        // 入站 ws: 客户端 ws://host:port/ws/v1/messages, 每帧一个 Anthropic 请求
+        // 入站 ws: 支持 /ws/v1/messages(Anthropic) /ws/v1/chat/completions /ws/v1/responses(OpenAI)
+        // 每帧一个请求, 响应格式由路径自动识别
         .route(
-            "/ws/v1/messages",
-            axum::routing::get(move |ws: axum::extract::ws::WebSocketUpgrade| {
-                super_instruct_server::ws::ws_handler(ws, core_for_ws)
-            }),
+            "/ws/{*path}",
+            axum::routing::get(
+                move |uri: http::Uri, ws: axum::extract::ws::WebSocketUpgrade| {
+                    super_instruct_server::ws::ws_handler(uri, ws, core_for_ws)
+                },
+            ),
         )
         .route("/{*path}", axum::routing::any(move |req| proxy::handle_proxy(req, core)));
 

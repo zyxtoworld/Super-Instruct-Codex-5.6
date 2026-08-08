@@ -4,6 +4,7 @@
 pub mod anthropic;
 pub mod core;
 pub mod extensions;
+pub mod formats;
 pub mod ws;
 
 pub const BRIDGE_MD_FALLBACK: &str = include_str!("../../bridge.md");

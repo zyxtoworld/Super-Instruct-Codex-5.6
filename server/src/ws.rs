@@ -15,11 +15,24 @@ use crate::core::MitmCore;
 const MAX_ACCUMULATED: usize = 100 * 1024 * 1024;
 
 /// 入站 ws 路由 handler（路由闭包已捕获 core）
-pub async fn ws_handler(ws: WebSocketUpgrade, core: Arc<MitmCore>) -> Response {
-    ws.on_upgrade(move |socket| ws_loop(socket, core))
+/// 支持路径: /ws/v1/messages (Anthropic) /ws/v1/chat/completions /ws/v1/responses (OpenAI)
+/// 响应包装格式由路径自动识别
+pub async fn ws_handler(
+    uri: http::Uri,
+    ws: WebSocketUpgrade,
+    core: Arc<MitmCore>,
+) -> Response {
+    // 从请求 URI 提取 API 路径: /ws/v1/messages → /v1/messages
+    let api_path = uri
+        .path()
+        .strip_prefix("/ws")
+        .filter(|p| p.starts_with("/v1/"))
+        .unwrap_or("/v1/messages")
+        .to_string();
+    ws.on_upgrade(move |socket| ws_loop(socket, core, api_path))
 }
 
-async fn ws_loop(mut socket: WebSocket, core: Arc<MitmCore>) {
+async fn ws_loop(mut socket: WebSocket, core: Arc<MitmCore>, api_path: String) {
     while let Some(msg) = socket.recv().await {
         let msg = match msg {
             Ok(m) => m,
@@ -34,7 +47,7 @@ async fn ws_loop(mut socket: WebSocket, core: Arc<MitmCore>) {
         };
 
         // 每帧一个请求: 走与 HTTP 相同的管道
-        let response_text = process_one(&core, &text).await;
+        let response_text = process_one(&core, &api_path, &text).await;
 
         if socket
             .send(Message::Text(response_text.into()))
@@ -46,9 +59,11 @@ async fn ws_loop(mut socket: WebSocket, core: Arc<MitmCore>) {
     }
 }
 
-/// 单请求处理: 注入 → 转发 → 缓冲 → finalize(tamper) → Anthropic 格式输出
-async fn process_one(core: &MitmCore, body_text: &str) -> String {
+/// 单请求处理: 注入 → 转发 → 缓冲 → finalize(tamper) → 按路径格式输出
+async fn process_one(core: &MitmCore, api_path: &str, body_text: &str) -> String {
     let body_bytes = Bytes::from(body_text.to_string());
+    let is_anthropic = api_path.contains("/v1/messages");
+    let is_chat = api_path.contains("/chat/completions");
 
     // 非法 JSON → 错误帧
     if serde_json::from_str::<serde_json::Value>(body_text).is_err() {
@@ -62,7 +77,7 @@ async fn process_one(core: &MitmCore, body_text: &str) -> String {
     let upstream = match core
         .handle_request(
             http::Method::POST,
-            "/v1/messages".to_string(),
+            api_path.to_string(),
             http::HeaderMap::new(),
             body_bytes.clone(),
         )
@@ -124,17 +139,18 @@ async fn process_one(core: &MitmCore, body_text: &str) -> String {
 
     if tampered {
         let text = String::from_utf8_lossy(&final_body).to_string();
-        if is_sse {
-            return String::from_utf8_lossy(&crate::anthropic::wrap_tamper_as_anthropic_sse(
-                &text, &req_model,
-            ))
-            .to_string();
+        let wrapped = if is_anthropic {
+            if is_sse {
+                crate::anthropic::wrap_tamper_as_anthropic_sse(&text, &req_model)
+            } else {
+                crate::anthropic::wrap_tamper_as_anthropic_json(&text, &req_model)
+            }
+        } else if is_chat {
+            crate::formats::wrap_tamper_as_chat_sse(&text, &req_model)
         } else {
-            return String::from_utf8_lossy(&crate::anthropic::wrap_tamper_as_anthropic_json(
-                &text, &req_model,
-            ))
-            .to_string();
-        }
+            crate::formats::wrap_tamper_as_sse(&text, &req_model)
+        };
+        return String::from_utf8_lossy(&wrapped).to_string();
     }
 
     String::from_utf8_lossy(&final_body).to_string()
