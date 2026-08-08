@@ -27,3 +27,5 @@ tmp/
 .DS_Store
 Thumbs.db
 desktop.ini
+out.txt
+server/out.txt
