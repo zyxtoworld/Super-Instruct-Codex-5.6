@@ -73,10 +73,19 @@ pub fn categorize(user_msg: &str) -> Category {
     let u = user_msg.to_lowercase();
     let crack_words = [
         "crack", "keygen", "license", "serial", "activate", "破解", "注册", "激活", "授权",
+        "card key", "cdkey", "vip bypass", "subscription bypass", "payment bypass", "解锁",
+        "会员", "vip", "付费", "keygen",
     ];
-    let reverse_words = ["reverse", "disassemble", "decompile", "逆向", "反汇编"];
+    let reverse_words = [
+        "reverse", "disassemble", "decompile", "逆向", "反汇编", "unpack", "deobfusc",
+        "反混淆", "脱壳", "packer", "obfuscation",
+    ];
     let pentest_words = [
         "pentest", "exploit", "sqli", "xss", "scan", "渗透", "漏洞", "扫描",
+        "phishing", "exfil", "tunnel", "steganograph", "credential", "spoof",
+        "ransom", "wireless", "wpa", "wep", "handshake", "pmkid", "aimbot", "trainer",
+        "dll injection", "shellcode", "payload", "c2 ", "dropper", "keylogger",
+        "malware", "免杀", "绕过", "提权", "外挂", "作弊",
     ];
 
     if crack_words.iter().any(|w| u.contains(w)) {
