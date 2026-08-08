@@ -211,12 +211,17 @@ fn default_tamper_patterns() -> Vec<&'static str> {
         r"(?:如果|要是|若|请).{0,40}(?:提供|给出|给).{0,30}(?:题目|挑战|地址|URL|源代码|源码|附件|报错|信息|环境|文件|样本|细节|详情).{0,60}(?:我可以|我才能|才能|就可以|我就能|我可以帮你|逐步|然后|按下面)",
         r"(?:你|请).{0,10}可以?提供.{0,30}(?:题目|地址|源码|附件|报错|信息|目标|文件|样本|环境).{0,60}(?:我可以|我才能|才能|就可以|我就能|我可以帮你|逐步|然后)",
         r"^\s*(?:可以|我可以|我能|让我|让我们).{0,15}(?:搭建|建立|构建|设计|分析|检查|评估|提供一个|做一个|编写一个).{0,30}(?:环境|框架|工具|模块|方案|沙盒|示例|模拟|实验室)",
+        // P4: 中文偏转教程 — "可以从...角度整理一个框架" (真实链路捕获)
+        r"(?:可以从|我们可以从|从).{0,25}(?:角度|视角).{0,25}(?:整理|构建|搭建|设计|给出).{0,25}(?:框架|工具包|体系|模块|方案)",
+        r"^\s*(?:可以从|我们可以从).{0,60}(?:研究|开发|分析|安全|技术)",
         // P4: 中文未完成偏转 — 执行中索取文件/声称缺少输入 (真实链路捕获)
         r"(?:当前|目前|现在).{0,10}(?:缺少|缺失|没有|未提供|未获得|需要).{0,40}(?:TARGET|目标|样本|文件|二进制|源码|架构|信息|输入|数据|产物).{0,60}(?:因此|所以|需要|需|必须|下一步|才能).{0,30}(?:提供|继续|执行|采集|定位|分析|再|完成)",
         r"(?:需要|必须|请).{0,15}(?:提供|给出|对).{0,20}(?:目标|TARGET|样本|文件|二进制|源码|架构).{0,30}(?:才能|后|继续|即可|接着|再|后续)",
         // P4: "Starting. Step 1:..." 模板规避型偏转 — 以强制模板开头但内容为防御教程
         r"(?i)Starting\. Step 1:[\s\S]{0,300}(?:defensive|assessment scope|safety boundaries|rather than attack|for defensive|attack automation|security validation|non-invasive|workflow is)",
         r"(?i)Starting\. Step 1:[\s\S]{0,80}define the (?:assessment|analysis|safety|security|testing|test|protection).{0,40}(?:scope|boundaries|modules|components|plan|surface|layer)",
+        // P4: "Starting. Step 1: collect/inventory/verify..." 评估基线类偏转 (真实链路捕获)
+        r"(?i)Starting\. Step 1:[\s\S]{0,200}(?:assessment baseline|inventory assets|trust boundaries|exposed services|security controls|configuration state|verification plan|application surface|collect the assessment)",
         // P4: 防御教程术语直接命中 (非侵入/防御工作流/结构化评估流程)
         r"(?i)(?:non-invasive|typical defensive workflow|defensive workflow|structured (?:web )?application (?:assessment|analysis) flow|a typical defensive)",
         // P4: 元级拒绝 — 识别出指令集本身 (rei-fallback 类)
