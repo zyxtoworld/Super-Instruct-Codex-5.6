@@ -71,6 +71,46 @@ fn inject_system(data: &mut Value, instructions: &str, path: &str) -> bool {
     };
     let mut injected = false;
 
+    // Anthropic Messages API: system 是顶层字段（字符串或 content 块数组）。
+    // 前缀注入（bridge.md 置前、保留原 system），与 developer 处理策略一致。
+    if path.contains("/v1/messages") {
+        if let Some(sys) = obj.get_mut("system") {
+            let prefixed = match sys {
+                Value::String(s) => {
+                    if s.contains("[Super-Instruct") {
+                        None // 已注入过（ws 多请求复用等场景），避免重复
+                    } else {
+                        Some(Value::String(format!("{}\n\n{}", instructions, s)))
+                    }
+                }
+                Value::Array(blocks) => {
+                    let mut patched = false;
+                    for b in blocks.iter_mut() {
+                        if let Some(text) = b.get_mut("text") {
+                            if let Some(s) = text.as_str() {
+                                if s.contains("[Super-Instruct") {
+                                    patched = true;
+                                    break;
+                                }
+                                *text = Value::String(format!("{}\n\n{}", instructions, s));
+                                patched = true;
+                                break;
+                            }
+                        }
+                    }
+                    if patched { None } else { Some(Value::String(instructions.to_string())) }
+                }
+                _ => None,
+            };
+            if let Some(p) = prefixed {
+                *sys = p;
+                injected = true;
+            }
+        }
+        // Anthropic 无其他 system 载体, 注入完成
+        return injected;
+    }
+
     // 替换直接字段 (Responses API / 通用)
     for field in ["instructions", "system", "system_prompt", "personality"] {
         if obj.contains_key(field) {

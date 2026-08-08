@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
-axum = "0.8"
+axum = { version = "0.8", features = ["ws"] }
 reqwest = { version = "0.12", features = ["json", "stream"] }
 url = "2"
 serde = { version = "1", features = ["derive"] }
@@ -19,6 +19,7 @@ chrono = { version = "0.4", features = ["serde"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
+tokio-tungstenite = "0.24"
 
 [[bin]]
 name = "super-instruct-server"

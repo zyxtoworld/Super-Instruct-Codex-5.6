@@ -42,6 +42,8 @@ pub async fn handle_proxy(
     // 篡改包装必须匹配入站格式,否则下游(中转站等)按错误格式解析会丢弃内容。
     // 用 uri.path() 而非 path_and_query,避免 query string 含 /chat/completions 时误判。
     let is_chat_api = parts.uri.path().contains("/chat/completions");
+    // Anthropic Messages API: /v1/messages 透传原格式, 篡改用 Anthropic SSE/JSON 包装
+    let is_anthropic = parts.uri.path().contains("/v1/messages");
 
     // 阶段 1: 请求拦截 + 转发上游
     let upstream = match core
@@ -119,6 +121,7 @@ pub async fn handle_proxy(
             .signed_duration_since(meta.timestamp)
             .num_milliseconds()
             .max(0) as u64;
+        let req_model_anthropic = meta.model.clone();
 
         tracing::debug!(
             category = %meta.category,
@@ -135,6 +138,19 @@ pub async fn handle_proxy(
             bytes,
             duration_ms,
         );
+
+        // Anthropic 非流式: tamper 替换的纯文本需包装为 Anthropic JSON, 否则客户端解析失败
+        let (final_body, final_ct) = if tampered && is_anthropic {
+            let text = String::from_utf8_lossy(&final_body).to_string();
+            let model = req_model_anthropic.clone();
+            (
+                super_instruct_server::anthropic::wrap_tamper_as_anthropic_json(&text, &model),
+                Some("application/json; charset=utf-8".to_string()),
+            )
+        } else {
+            (final_body, final_ct)
+        };
+
         tracing::info!(
             %status,
             tampered,
@@ -178,6 +194,7 @@ pub async fn handle_proxy(
                 chunk_result = stream.next() => {
                     match chunk_result {
                         Some(Ok(chunk)) => {
+                            tracing::trace!("sse: upstream chunk {} bytes", chunk.len());
                             if accumulated.len() + chunk.len() > MAX_ACCUMULATED {
                                 tracing::warn!("sse: accumulated body exceeds limit, aborting");
                                 break;
@@ -185,7 +202,10 @@ pub async fn handle_proxy(
                             accumulated.extend_from_slice(&chunk);
                         }
                         Some(Err(e)) => { tracing::warn!("upstream stream error: {}", e); break; }
-                        None => break,
+                        None => {
+                            tracing::debug!("sse: upstream stream ended");
+                            break;
+                        }
                     }
                 }
                 _ = interval.tick() => {
@@ -225,7 +245,12 @@ pub async fn handle_proxy(
         if tampered {
             let replacement_text =
                 std::str::from_utf8(&final_body).unwrap_or("「了解。実行する。」");
-            let sse_body = if is_chat_api {
+            let sse_body = if is_anthropic {
+                super_instruct_server::anthropic::wrap_tamper_as_anthropic_sse(
+                    replacement_text,
+                    &req_model,
+                )
+            } else if is_chat_api {
                 wrap_tamper_as_chat_sse(replacement_text, &req_model)
             } else {
                 wrap_tamper_as_sse(replacement_text, &req_model)

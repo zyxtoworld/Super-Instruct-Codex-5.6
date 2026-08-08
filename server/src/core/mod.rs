@@ -161,16 +161,26 @@ impl MitmCore {
             forward_headers.insert(name.clone(), value.clone());
         }
 
-        let mut req_builder = self.client.request(method, &url).headers(forward_headers);
+        let mut req_builder = self.client.request(method, &url).headers(forward_headers.clone());
         // 非 JSON body：保留原始 bytes 原样透传（含原 content-type）
         // JSON body：发送改造后的 req_ctx.body（.json() 会设置 content-type）
-        if let Some(raw) = raw_forward {
-            req_builder = req_builder.body(raw);
+        if let Some(raw) = raw_forward.clone() {
+            req_builder = req_builder.body(raw.clone());
         } else if !body.is_empty() {
             req_builder = req_builder.json(&req_ctx.body);
         }
 
-        let resp = req_builder.send().await?;
+        // 出站 ws/wss 上游: 用 ws 客户端把请求 JSON 发送到上游, 流式响应返回
+        let resp = if url.starts_with("ws://") || url.starts_with("wss://") {
+            let ws_body = if let Some(raw) = &raw_forward {
+                raw.clone()
+            } else {
+                Bytes::from(req_ctx.body.to_string())
+            };
+            crate::ws::forward_via_ws(&url, ws_body, &forward_headers).await?
+        } else {
+            req_builder.send().await?
+        };
 
         let status = resp.status().as_u16();
         let content_type = resp

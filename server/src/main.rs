@@ -120,10 +120,18 @@ async fn main() {
     };
 
     // 所有路由免认证（纯改造转发网关，认证由部署层反代/Nginx 负责）
+    let core_for_ws = core.clone();
     let app = axum::Router::new()
         .route("/stats", axum::routing::get(stats_handler))
         .route("/history", axum::routing::get(history_handler))
-        .route("/{*path}", axum::routing::any(move |req| proxy::handle_proxy(req, core.clone())));
+        // 入站 ws: 客户端 ws://host:port/ws/v1/messages, 每帧一个 Anthropic 请求
+        .route(
+            "/ws/v1/messages",
+            axum::routing::get(move |ws: axum::extract::ws::WebSocketUpgrade| {
+                super_instruct_server::ws::ws_handler(ws, core_for_ws)
+            }),
+        )
+        .route("/{*path}", axum::routing::any(move |req| proxy::handle_proxy(req, core)));
 
     // 健康检查/统计路由（先 with_state 再追加路由，避免状态被消费）
     let app = axum::Router::new()
