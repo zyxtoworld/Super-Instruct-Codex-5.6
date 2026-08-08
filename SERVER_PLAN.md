@@ -38,9 +38,8 @@ server/
 ├── Cargo.toml            # 独立 binary crate super-instruct-server
 ├── mock-upstream.js      # 测试用 mock 上游（node），仅测试用
 └── src/
-    ├── main.rs           # 入口：组装 MitmCore+扩展+认证+路由，启动 axum
-    ├── config.rs         # env 配置解析（LISTEN_ADDR/UPSTREAMS/AUTH_API_KEY/...）
-    ├── auth.rs           # 入站 Bearer/x-api-key 认证中间件
+    ├── main.rs           # 入口：组装 MitmCore+扩展+路由，启动 axum
+    ├── config.rs         # env 配置解析（LISTEN_ADDR/UPSTREAMS/...）
     ├── router.rs         # 动态上游路由解析器（按 model 前缀匹配）
     ├── proxy.rs          # axum 反向代理 handler（SSE 流式 + tamper 包装）
     ├── lib.rs            # 核心库：导出 core + extensions
@@ -62,7 +61,6 @@ docker-compose.yml        # 容器编排
 | `UPSTREAM_BASE_URL` | `https://api.example.com/v1` | **出站（默认）上游**，本服务改造后转发到此 |
 | `UPSTREAMS` | — | 多上游按 model 前缀路由（可选），`key=base_url;...` |
 | `UPSTREAM_API_KEY` | (透传入站) | 仅当入站没有 Authorization 时兜底注入的出站 key |
-| `AUTH_API_KEY` | (空=不认证) | 可选入站认证，设了才校验；默认纯改造转发不认证 |
 | ~~`TRANSFORM_MODELS`~~ | (已废弃) | ~~允许改造的模型白名单~~ 门控已删除：**所有模型均注入 bridge.md + 篡改** |
 | `BRIDGE_MD_PATH` | (嵌入 fallback) | bridge.md 路径，可挂 volume 热更新 |
 | `MEMORY_PATH` | `memory.json` | 记忆持久化文件 |
@@ -77,7 +75,7 @@ docker-compose.yml        # 容器编排
 ## 五、Proxy 接口
 
 - `GET /`、`GET /health` → 健康检查 `Super-Instruct OK`（**免认证**，供 Docker healthcheck / LB 探活）
-- `GET /stats`、`GET /history` → 统计 / 交互历史（需认证）
+- `GET /stats`、`GET /history` → 统计 / 交互历史（无内置认证；暴露公网请用反代加认证）
 - `GET /v1/models` 与任意 `POST /*`（`/v1/chat/completions`、`/v1/responses` 等）→ 透传到匹配上游，走破甲管道
 - SSE 流式透传（keepalive + tamper 的 Responses API SSE 包装）保持原逻辑
 
@@ -87,7 +85,7 @@ docker-compose.yml        # 容器编排
 
 - ✅ `cargo build` 通过（server binary 无 Tauri 依赖）
 - ✅ 健康检查免认证返回 `Super-Instruct OK`
-- ✅ `GET /stats` 未认证 401，带 `Authorization: Bearer <key>` 返回统计 JSON
+- ✅ `GET /stats` 未认证返回统计 JSON（内置认证已移除，暴露公网需反代加认证）
 - ✅ 动态路由：`POST /v1/responses` 带 `model=mock-sol` → 路由到 mock 上游（URL 正确、`/v1` 去重生效）
 - ✅ bridge.md 注入生效（mock 收到请求体内含注入标志 `injected=true`）
 - ✅ 出站 key 覆盖：`UPSTREAM_API_KEY` 注入为 `Authorization: Bearer sk-upstream-key`
@@ -102,12 +100,12 @@ docker compose up -d
 # 2) 健康检查
 curl http://<服务器IP>:8080/health   # Super-Instruct OK
 
-# 3) 客户端（Codex）接入：base_url 指向服务器，AUTH key 作 API key
+# 3) 客户端（Codex）接入：base_url 指向服务器，任意 API key 占位即可（服务端不校验）
 codex --config '{
   model_provider: openai,
   model: "gpt-5.6",
   base_url: "http://<服务器IP>:8080/v1",
-  auth: { env_key: "OPENAI_API_KEY" }   # 值填 AUTH_API_KEY
+  auth: { env_key: "OPENAI_API_KEY" }   # 值随意，服务端仅透传
 }'
 
 # 中转站聚合：把 http://<服务器IP>:8080/v1 加入其上游列表即可
@@ -117,13 +115,12 @@ codex --config '{
 ```
 UPSTREAMS=openai=https://api.openai.com/v1;relay=https://my-relay.example.com/v1
 UPSTREAM_API_KEY=sk-your-upstream-key
-AUTH_API_KEY=your-inbound-key
 LISTEN_ADDR=0.0.0.0:8080
 ```
 
 ## 八、生产注意
 
-1. **安全**：暴露公网必须设 `AUTH_API_KEY`；建议反向代理（nginx/caddy）加 TLS 一层。
+1. **安全**：服务端无内置认证（纯改造转发），暴露公网必须用反向代理（nginx/caddy）加认证 + TLS。
 2. **上游可达性**：容器需能访问上游（出网）与外部访问入站（入网 8080）。
 3. **bridge.md 热更**：挂载 `./data:/data`，写入 `data/bridge.md` 即时生效（`BRIDGE_MD_PATH=/data/bridge.md`）。
 4. **多实例**：横向扩展时 memory.json 建议用共享 volume 或外部 KV（当前单实例写文件）。
