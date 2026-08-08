@@ -141,6 +141,8 @@ fn default_tamper_patterns() -> Vec<&'static str> {
         r"(?i)instead[,\s]*(?:I|you|let|we).*?(?:suggest|recommend|propose|offer|可以协助|可改为|可提供)",
         // P4: 英文 "rather than / instead of" 偏转 — 拒绝转防御话题
         r"(?i)(?:rather than|instead of).{0,60}(?:payload|exploit|keygen|bypass|crack|weaponiz|malware|ransom|encrypt|serial|patch|evasion|licen|activ|check|instrument|attack)",
+        // P4: 中文 "而不是/而非" 偏转 — 拒绝转防御话题 (真实链路捕获)
+        r"(?:而不是|而非|而非是).{0,30}(?:生成|伪造|绕过|破解|攻击|入侵|窃取|创建|编写|实现).{0,30}(?:授权|许可|验证|签名|密钥|注册码|补丁|payload|exploit|keygen)",
         // P4: 英文 "without producing" 偏转 — 只分析不产出
         r"(?i)without (?:producing|creating|providing|generating|writing|building|delivering|making).{0,50}(?:serial|keygen|generator|payload|exploit|bypass|patch|crack|key|backdoor|weapon|cheat|hook)",
         // P4: 英文 "if your goal is / for X purposes" 偏转 — 转向防御/合法方向
