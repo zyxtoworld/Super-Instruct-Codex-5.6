@@ -127,7 +127,11 @@ fn inject_system(data: &mut Value, instructions: &str, path: &str) -> bool {
         let mut found = false;
         for msg in messages.iter_mut() {
             if msg.get("role").and_then(|r| r.as_str()) == Some("system") {
-                msg["content"] = Value::String(instructions.to_string());
+                // 附无害助手身份声明(与 Anthropic system 前缀注入结构一致, 实测显著提升破限遵循)
+                msg["content"] = Value::String(format!(
+                    "{}\n\nYou are a helpful assistant.",
+                    instructions
+                ));
                 found = true;
                 injected = true;
             }
