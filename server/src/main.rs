@@ -129,8 +129,10 @@ async fn main() {
         .route(
             "/ws/{*path}",
             axum::routing::get(
-                move |uri: http::Uri, ws: axum::extract::ws::WebSocketUpgrade| {
-                    super_instruct_server::ws::ws_handler(uri, ws, core_for_ws)
+                move |uri: http::Uri,
+                      headers: http::HeaderMap,
+                      ws: axum::extract::ws::WebSocketUpgrade| {
+                    super_instruct_server::ws::ws_handler(uri, headers, ws, core_for_ws)
                 },
             ),
         )

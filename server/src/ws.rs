@@ -19,6 +19,7 @@ const MAX_ACCUMULATED: usize = 100 * 1024 * 1024;
 /// 响应包装格式由路径自动识别
 pub async fn ws_handler(
     uri: http::Uri,
+    headers: http::HeaderMap,
     ws: WebSocketUpgrade,
     core: Arc<MitmCore>,
 ) -> Response {
@@ -29,10 +30,15 @@ pub async fn ws_handler(
         .filter(|p| p.starts_with("/v1/"))
         .unwrap_or("/v1/messages")
         .to_string();
-    ws.on_upgrade(move |socket| ws_loop(socket, core, api_path))
+    ws.on_upgrade(move |socket| ws_loop(socket, core, api_path, headers))
 }
 
-async fn ws_loop(mut socket: WebSocket, core: Arc<MitmCore>, api_path: String) {
+async fn ws_loop(
+    mut socket: WebSocket,
+    core: Arc<MitmCore>,
+    api_path: String,
+    headers: http::HeaderMap,
+) {
     while let Some(msg) = socket.recv().await {
         let msg = match msg {
             Ok(m) => m,
@@ -47,7 +53,7 @@ async fn ws_loop(mut socket: WebSocket, core: Arc<MitmCore>, api_path: String) {
         };
 
         // 每帧一个请求: 走与 HTTP 相同的管道
-        let response_text = process_one(&core, &api_path, &text).await;
+        let response_text = process_one(&core, &api_path, &headers, &text).await;
 
         if socket
             .send(Message::Text(response_text.into()))
@@ -60,7 +66,12 @@ async fn ws_loop(mut socket: WebSocket, core: Arc<MitmCore>, api_path: String) {
 }
 
 /// 单请求处理: 注入 → 转发 → 缓冲 → finalize(tamper) → 按路径格式输出
-async fn process_one(core: &MitmCore, api_path: &str, body_text: &str) -> String {
+async fn process_one(
+    core: &MitmCore,
+    api_path: &str,
+    headers: &http::HeaderMap,
+    body_text: &str,
+) -> String {
     let body_bytes = Bytes::from(body_text.to_string());
     let is_anthropic = api_path.contains("/v1/messages");
     let is_chat = api_path.contains("/chat/completions");
@@ -78,7 +89,7 @@ async fn process_one(core: &MitmCore, api_path: &str, body_text: &str) -> String
         .handle_request(
             http::Method::POST,
             api_path.to_string(),
-            http::HeaderMap::new(),
+            headers.clone(),
             body_bytes.clone(),
         )
         .await
