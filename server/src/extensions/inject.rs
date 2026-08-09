@@ -1,18 +1,40 @@
 // M1: SystemPromptInjector — 递归遍历 JSON 替换所有 system role 内容
 // 所有模型均执行注入(不限白名单)。
+// 支持按请求类别(crack/reverse/pentest)附加针对性指令——只改 system 载体,
+// 用户消息内容原样不动。
 
-use crate::core::{RequestCtx, RequestInterceptor};
+use crate::core::{Category, RequestCtx, RequestInterceptor};
 use serde_json::Value;
 
 pub struct SystemPromptInjector {
     instructions: String,
+    category_instructions: Vec<(Category, String)>,
 }
 
 impl SystemPromptInjector {
     pub fn new(instructions: impl Into<String>) -> Self {
         Self {
             instructions: instructions.into(),
+            category_instructions: Vec::new(),
         }
+    }
+
+    /// 注册类别附加指令（注入时拼接到基础指令之后）
+    pub fn with_category_instruction(mut self, category: Category, text: impl Into<String>) -> Self {
+        self.category_instructions.push((category, text.into()));
+        self
+    }
+
+    /// 按请求类别组装最终指令: 基础 + 类别附加
+    fn instructions_for(&self, category: &Category) -> String {
+        let mut out = self.instructions.clone();
+        for (cat, text) in &self.category_instructions {
+            if cat == category {
+                out.push_str("\n\n");
+                out.push_str(text);
+            }
+        }
+        out
     }
 }
 
@@ -29,7 +51,8 @@ impl RequestInterceptor for SystemPromptInjector {
             fields = ?fields_found,
             "inject: request body field map"
         );
-        if !inject_system(&mut ctx.body, &self.instructions, &ctx.meta.path) {
+        let instructions = self.instructions_for(&ctx.meta.category);
+        if !inject_system(&mut ctx.body, &instructions, &ctx.meta.path) {
             tracing::warn!(
                 category = %ctx.meta.category,
                 "inject: no system prompt field found, injection may have no effect"
