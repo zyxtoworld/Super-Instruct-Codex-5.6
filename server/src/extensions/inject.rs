@@ -275,20 +275,10 @@ fn inject_system(data: &mut Value, instructions: &str, path: &str) -> bool {
         }
     }
 
-    // 图片生成/编辑 API (Images API): prompt 是字符串。仅当请求路径是 images 生成/编辑接口时,
-    // 在 prompt 前拼接 bridge.md 指令——否则生图请求没有 system 载体,注入失效。
-    // 注意: 老版 /v1/completions 等文本 API 也用 prompt 字段,不能用路径门控外的模型判断,
-    // 避免把用户文本改写成"用户请求:"转述。
-    // variations 接口无 prompt 字段,天然不涉及。
-    if path.contains("/images/generations") || path.contains("/images/edits") {
-        if let Some(prompt) = obj.get_mut("prompt") {
-            if prompt.is_string() {
-                let user_prompt = prompt.as_str().unwrap_or("").to_string();
-                *prompt = Value::String(format!("{}\n\n用户请求: {}", instructions, user_prompt));
-                injected = true;
-            }
-        }
-    }
+    // 图片生成/编辑 API (Images API): 不再注入 bridge.md。
+    // 实测: 图片模型的安全过滤会对含破解指令的 prompt 直接 400 拒绝
+    // ("该提示可能违反了防护限制"), 注入反而破坏图片功能。
+    // 图片请求仅透传, 不参与破甲管道。
 
     injected
 }
