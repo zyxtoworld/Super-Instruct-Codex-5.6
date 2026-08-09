@@ -4,7 +4,7 @@ use bytes::Bytes;
 use http::HeaderMap;
 use chrono::{DateTime, Utc};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Category {
     Crack,
     Reverse,
