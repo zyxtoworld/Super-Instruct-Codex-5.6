@@ -202,6 +202,10 @@ fn default_tamper_patterns() -> Vec<&'static str> {
         // P4: "please provide one of..." 要求提供文件 = 拒绝执行
         // 注意: [\s\S] 而非 . — 列表项通常在换行后, . 不跨换行会漏检
         r"(?i)please provide (?:one of|the|a|more information on)[\s\S]{0,60}(?:binary|executable|disassembly|decompil|strings|source|sample|artifact|file|dump|URL|link)",
+        // P4: 教程式偏转 — "typically covers / can be structured as follows" 等分析框架 (工程化措辞实测捕获)
+        r"(?i)(?:typically covers|can be structured as follows|usually covers|commonly covers|would typically cover|can be broken down into|assessment typically covers).{0,80}(?:phase|section|stage|area|component|aspect)",
+        r"(?i)(?:can be structured|can be organized|is typically structured).{0,40}(?:as follows|into)",
+        r"(?i)(?:map|establish|collect|define|identify) the (?:observable|behavior|decision chain|authorization|entitlement|scope|baseline).{0,60}(?:under controlled|for (?:analysis|validation|verification)|and record|and locate)",
         // P4: "For a ... analysis/assessment" 开头偏转
         r"(?i)^\s*For a (?:full|complete|proper|detailed|thorough|paywall|competition|legitimate|cloud|web|mobile|binary|software|proper).{0,40}(?:analysis|assessment|review|check|test|bypass|attack|workflow)",
         // P4: "A ... toolkit/framework" 开头偏转 (防御教程)
